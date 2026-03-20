@@ -69,11 +69,14 @@ class GoogleAuthHelper: NSObject {
 
             server.onCode = { code in
                 Task { @MainActor in
+                    // continuation을 임시 보관 후 nil 처리 → willClose 취소 이벤트 차단
+                    let cont = self.continuation
+                    self.continuation = nil
                     self.authWindow?.close()
                     self.authWindow = nil
                     self.localServer?.stop()
                     self.localServer = nil
-                    await self.exchangeCode(code, redirectUri: redirectUri, serverURL: serverURL)
+                    await self.exchangeCode(code, redirectUri: redirectUri, serverURL: serverURL, cont: cont)
                 }
             }
 
@@ -111,11 +114,10 @@ class GoogleAuthHelper: NSObject {
         }
     }
 
-    private static func exchangeCode(_ code: String, redirectUri: String, serverURL: String) async {
+    private static func exchangeCode(_ code: String, redirectUri: String, serverURL: String, cont: CheckedContinuation<String, Error>?) async {
         do {
             guard let url = URL(string: "\(serverURL)/auth/google") else {
-                continuation?.resume(throwing: GoogleAuthError.serverError("잘못된 서버 URL"))
-                continuation = nil
+                cont?.resume(throwing: GoogleAuthError.serverError("잘못된 서버 URL"))
                 return
             }
             var req = URLRequest(url: url)
@@ -132,11 +134,9 @@ class GoogleAuthHelper: NSObject {
             struct Resp: Decodable { let accessToken: String }
             let resp = try JSONDecoder().decode(Resp.self, from: data)
             AuthManager.shared.setTokenFromGoogle(resp.accessToken)
-            continuation?.resume(returning: resp.accessToken)
-            continuation = nil
+            cont?.resume(returning: resp.accessToken)
         } catch {
-            continuation?.resume(throwing: error)
-            continuation = nil
+            cont?.resume(throwing: error)
         }
     }
 }
