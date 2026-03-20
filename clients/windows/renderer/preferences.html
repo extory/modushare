@@ -187,14 +187,32 @@
       const email = document.getElementById('shareEmail').value.trim();
       const errEl = document.getElementById('shareError');
       errEl.style.display = 'none';
-      if (!email) return;
+
+      if (!email) {
+        errEl.textContent = '이메일을 입력해주세요.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (!email.includes('@') || !email.includes('.')) {
+        errEl.textContent = '올바른 이메일 형식이 아닙니다.';
+        errEl.style.display = 'block';
+        return;
+      }
 
       const result = await ipcRenderer.invoke('share:add', email);
       if (result.ok) {
         document.getElementById('shareEmail').value = '';
         loadPartners();
       } else {
-        errEl.textContent = result.error || '추가 실패';
+        // 서버 에러 메시지 그대로 표시
+        const serverMsg = result.error || '';
+        if (serverMsg.includes('찾을 수 없') || serverMsg.includes('404')) {
+          errEl.textContent = '등록되지 않은 이메일입니다. 가입 여부를 확인해주세요.';
+        } else if (serverMsg.includes('이미')) {
+          errEl.textContent = '이미 공유 중인 사용자입니다.';
+        } else {
+          errEl.textContent = serverMsg || '추가 실패';
+        }
         errEl.style.display = 'block';
       }
     });

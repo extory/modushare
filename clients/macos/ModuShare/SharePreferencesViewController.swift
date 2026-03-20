@@ -180,7 +180,15 @@ class SharePreferencesViewController: NSViewController {
 
     @objc private func handleAdd() {
         let email = emailField.stringValue.trimmingCharacters(in: .whitespaces)
-        guard !email.isEmpty else { return }
+        guard !email.isEmpty else {
+            showError("이메일을 입력해주세요.")
+            return
+        }
+        // 간단한 이메일 형식 검사
+        guard email.contains("@"), email.contains(".") else {
+            showError("올바른 이메일 형식이 아닙니다.")
+            return
+        }
 
         addButton.isEnabled = false
         errorLabel.isHidden = true
@@ -193,15 +201,28 @@ class SharePreferencesViewController: NSViewController {
                     self.partners.insert(partner, at: 0)
                     self.tableView.reloadData()
                     self.addButton.isEnabled = true
+                    self.errorLabel.isHidden = true
                 }
-            } catch {
+            } catch let error as NSError {
                 await MainActor.run {
-                    self.errorLabel.stringValue = error.localizedDescription
-                    self.errorLabel.isHidden = false
+                    // 서버 에러 메시지 그대로 표시 (한국어 메시지 포함)
+                    let msg: String
+                    switch error.code {
+                    case 404: msg = "등록되지 않은 이메일입니다. 가입 여부를 확인해주세요."
+                    case 409: msg = "이미 공유 중인 사용자입니다."
+                    case 400: msg = error.localizedDescription
+                    default:  msg = "오류가 발생했습니다: \(error.localizedDescription)"
+                    }
+                    self.showError(msg)
                     self.addButton.isEnabled = true
                 }
             }
         }
+    }
+
+    private func showError(_ msg: String) {
+        errorLabel.stringValue = msg
+        errorLabel.isHidden = false
     }
 
     func removePartner(at row: Int) {

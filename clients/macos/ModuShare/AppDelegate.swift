@@ -132,19 +132,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showSharePreferences() {
-        if sharePrefsWindowController == nil {
-            let vc = SharePreferencesViewController()
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 440, height: 380),
-                styleMask: [.titled, .closable],
-                backing: .buffered,
-                defer: false
-            )
-            window.title = "ModuShare – 공유 관리"
-            window.contentViewController = vc
-            window.center()
-            sharePrefsWindowController = NSWindowController(window: window)
-        }
+        // 매번 새로 만들어야 viewDidLoad → loadPartners() 가 호출됨
+        let vc = SharePreferencesViewController()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 420),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "ModuShare – 공유 관리"
+        window.contentViewController = vc
+        window.center()
+        sharePrefsWindowController = NSWindowController(window: window)
         sharePrefsWindowController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -164,7 +163,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.loginWindowController?.close()
                 self?.loginWindowController = nil
                 self?.syncManager.start()
-                self?.updateMenu()
+                DispatchQueue.main.async { self?.updateMenu() }
             }
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 400, height: 440),
