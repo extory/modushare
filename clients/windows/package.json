@@ -51,10 +51,7 @@
       "target": [{ "target": "dmg", "arch": ["x64"] }],
       "icon": "assets/icons/mac/icon.icns",
       "category": "public.app-category.productivity",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "assets/entitlements.mac.plist",
-      "entitlementsInherit": "assets/entitlements.mac.plist"
+      "gatekeeperAssess": false
     },
     "nsis": {
       "oneClick": true,
