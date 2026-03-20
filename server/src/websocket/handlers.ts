@@ -66,13 +66,20 @@ export async function handleClipboardUpdate(
     return;
   }
 
-  const item = clipboardService.saveClipboardItem(
+  const result = clipboardService.saveClipboardItem(
     userId,
     deviceId,
     payload.contentType,
     contentText,
     imagePath
   );
+
+  if (result === 'QUOTA_EXCEEDED') {
+    sendError(senderWs, 'QUOTA_EXCEEDED', '저장 용량(20MB)을 초과했습니다. 기존 항목이 정리된 후 다시 시도해주세요.');
+    return;
+  }
+
+  const item = result;
 
   // Build broadcast payload (don't re-send large base64 blobs)
   const broadcastPayload: ClipboardUpdatePayload & { itemId: string } = {

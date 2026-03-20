@@ -1,18 +1,63 @@
-import { Tray, Menu, shell, app } from 'electron';
+import { Tray, Menu, shell, app, nativeImage } from 'electron';
 import path from 'path';
 import Store from 'electron-store';
 import { AppStore, openLoginWindow } from './main';
 import { WSClient } from './wsClient';
 import { ClipboardPoller } from './clipboardPoller';
 
+let flashTimer: ReturnType<typeof setInterval> | null = null;
+let flashCount = 0;
+
 export function createTray(
   store: Store<AppStore>,
   wsClient: WSClient,
   poller: ClipboardPoller
 ): Tray {
-  // Fallback icon path – replace with your actual .ico asset
-  const iconPath = path.join(__dirname, '../../assets/tray-icon.png');
-  const tray = new Tray(iconPath);
+  const iconNormal  = path.join(__dirname, '../../assets/tray-icon.png');
+  const iconAlert   = path.join(__dirname, '../../assets/tray-icon-alert.png');
+
+  // alert 아이콘이 없으면 normal 아이콘 사용 (빌드 환경 대비)
+  const alertExists = require('fs').existsSync(iconAlert);
+
+  const tray = new Tray(iconNormal);
+
+  // ── 신규 복사 알림 이펙트 ─────────────────────────────────────────────────
+  function startFlash(): void {
+    if (flashTimer) return; // 이미 깜빡이는 중이면 무시
+    flashCount = 0;
+    let toggle = false;
+    flashTimer = setInterval(() => {
+      toggle = !toggle;
+      tray.setImage(
+        toggle && alertExists ? iconAlert : iconNormal
+      );
+      flashCount++;
+      if (flashCount >= 10) { // 5회 깜빡임 후 정지
+        stopFlash();
+      }
+    }, 400);
+  }
+
+  function stopFlash(): void {
+    if (flashTimer) {
+      clearInterval(flashTimer);
+      flashTimer = null;
+    }
+    tray.setImage(iconNormal);
+  }
+
+  // WSClient에서 신규 원격 복사 이벤트 수신
+  wsClient.on('remoteClipboard', () => {
+    startFlash();
+  });
+
+  wsClient.on('quotaExceeded', () => {
+    tray.displayBalloon({
+      title: 'ModuShare',
+      content: '저장 용량(20MB)을 초과했습니다. 기존 항목이 정리된 후 다시 시도해주세요.',
+      iconType: 'warning',
+    });
+  });
 
   const updateMenu = () => {
     const syncEnabled = store.get('syncEnabled');
@@ -75,8 +120,6 @@ export function createTray(
   };
 
   updateMenu();
-
-  // Refresh menu when connection state changes
   wsClient.on('statusChange', updateMenu);
 
   return tray;

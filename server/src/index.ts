@@ -13,12 +13,17 @@ import clipboardRouter from './routes/clipboard';
 import uploadRouter from './routes/upload';
 import { attachWebSocketServer } from './websocket/wsServer';
 import { authService } from './services/authService';
+import { clipboardService } from './services/clipboardService';
 
 // ─── Database ─────────────────────────────────────────────────────────────────
 runMigrations();
 
 // Prune expired refresh tokens on startup
 authService.pruneExpiredTokens();
+
+// Prune clipboard items older than 10 minutes on startup + every minute
+clipboardService.pruneAgedItems();
+setInterval(() => clipboardService.pruneAgedItems(), 60 * 1000);
 
 // ─── Express app ─────────────────────────────────────────────────────────────
 const app = express();

@@ -20,6 +20,8 @@ class SyncManager: NSObject {
 
     private(set) var isConnected: Bool = false
     private var hasShownFirstCopyToast: Bool = false
+    private var flashTimer: Timer?
+    private var flashCount: Int = 0
 
     init(deviceId: String = UUID().uuidString) {
         self.deviceId = deviceId
@@ -235,6 +237,15 @@ extension SyncManager: WebSocketClientDelegate {
             if let payload = message.payload {
                 applyRemoteClipboardUpdate(payload)
             }
+            // 다른 기기에서 복사한 내역 → 메뉴바 아이콘 이펙트
+            DispatchQueue.main.async { self.startMenuBarFlash() }
+
+        case "ERROR":
+            if message.payload?.code == "QUOTA_EXCEEDED" {
+                DispatchQueue.main.async {
+                    self.showQuotaExceededNotification()
+                }
+            }
 
         case "CLIPBOARD_ACK":
             if !hasShownFirstCopyToast {
@@ -255,6 +266,45 @@ extension SyncManager: WebSocketClientDelegate {
 
         default:
             break
+        }
+    }
+
+    // MARK: – Menu bar flash
+
+    private func startMenuBarFlash() {
+        flashTimer?.invalidate()
+        flashCount = 0
+        flashTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.flashCount += 1
+            let isOn = self.flashCount % 2 == 1
+            NotificationCenter.default.post(
+                name: .menuBarFlash,
+                object: isOn ? "📋●" : "📋"
+            )
+            if self.flashCount >= 10 {
+                self.flashTimer?.invalidate()
+                self.flashTimer = nil
+                NotificationCenter.default.post(name: .menuBarFlash, object: "📋")
+            }
+        }
+    }
+
+    // MARK: – Quota exceeded notification
+
+    private func showQuotaExceededNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = "ModuShare – 용량 초과"
+        content.body = "저장 용량(20MB)을 초과했습니다. 기존 항목이 정리된 후 다시 시도해주세요."
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "modushare.quota",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            UNUserNotificationCenter.current().add(request)
         }
     }
 
@@ -287,4 +337,5 @@ extension SyncManager: WebSocketClientDelegate {
 
 extension Notification.Name {
     static let syncStatusChanged = Notification.Name("com.modushare.syncStatusChanged")
+    static let menuBarFlash      = Notification.Name("com.modushare.menuBarFlash")
 }

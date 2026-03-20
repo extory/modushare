@@ -57,6 +57,13 @@ export default function App() {
           addItem(newItem);
           break;
         }
+        case 'ERROR': {
+          const errPayload = msg.payload as { code?: string; message?: string };
+          if (errPayload?.code === 'QUOTA_EXCEEDED') {
+            showToast('⚠️ ' + (errPayload.message ?? '저장 용량(20MB)을 초과했습니다.'));
+          }
+          break;
+        }
         case 'CLIPBOARD_ACK': {
           if (!hasShownFirstCopyToast.current) {
             hasShownFirstCopyToast.current = true;

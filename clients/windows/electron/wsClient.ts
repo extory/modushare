@@ -163,6 +163,16 @@ export class WSClient extends EventEmitter {
           const img = nativeImage.createFromBuffer(buf);
           clipboard.writeImage(img);
         }
+        // 다른 기기에서 복사한 내역 → 트레이 이펙트 발동
+        this.emit('remoteClipboard');
+        break;
+      }
+
+      case 'ERROR': {
+        const errPayload = msg.payload as { code?: string };
+        if (errPayload?.code === 'QUOTA_EXCEEDED') {
+          this.emit('quotaExceeded');
+        }
         break;
       }
 

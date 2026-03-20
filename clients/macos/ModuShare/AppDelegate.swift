@@ -15,6 +15,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupMenuBar()
 
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(syncStatusDidChange),
+            name: .syncStatusChanged,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(menuBarFlashDidChange(_:)),
+            name: .menuBarFlash,
+            object: nil
+        )
+
         // If not authenticated, show login window
         if !AuthManager.shared.isAuthenticated {
             showLoginWindow()
@@ -82,6 +95,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         self.statusItem.menu = menu
+    }
+
+    // MARK: – Notification handlers
+
+    @objc private func syncStatusDidChange() {
+        updateMenu()
+    }
+
+    @objc private func menuBarFlashDidChange(_ notification: Notification) {
+        if let icon = notification.object as? String,
+           let button = statusItem.button {
+            button.title = icon
+        }
     }
 
     // MARK: – Actions
