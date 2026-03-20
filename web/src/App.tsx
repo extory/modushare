@@ -4,6 +4,7 @@ import { LoginForm } from './components/LoginForm';
 import { ClipboardFeed } from './components/ClipboardFeed';
 import { SyncToggle } from './components/SyncToggle';
 import { ShareManager } from './components/ShareManager';
+import { DownloadButton } from './components/DownloadButton';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useClipboardStore } from './store/clipboardStore';
 import { endpoints } from './api/endpoints';
@@ -170,6 +171,7 @@ export default function App() {
           />
           <SyncToggle enabled={syncEnabled} onToggle={handleSyncToggle} />
           <ShareManager />
+          <DownloadButton />
           <span style={styles.username}>{user.username}</span>
           <button style={styles.logoutBtn} onClick={handleLogout}>
             Sign Out
