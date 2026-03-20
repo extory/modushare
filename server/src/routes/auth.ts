@@ -59,7 +59,7 @@ router.post(
         googleId = p.sub; email = p.email; name = p.name ?? undefined; picture = p.picture ?? undefined;
       } else if (body.code && body.redirectUri) {
         // Electron 방식: Authorization Code → ID Token 교환
-        const codeClient = new OAuth2Client(config.GOOGLE_CLIENT_ID, undefined, body.redirectUri);
+        const codeClient = new OAuth2Client(config.GOOGLE_CLIENT_ID, config.GOOGLE_CLIENT_SECRET, body.redirectUri);
         const { tokens } = await codeClient.getToken(body.code);
         if (!tokens.id_token) {
           res.status(401).json({ error: 'Failed to get ID token from Google' });

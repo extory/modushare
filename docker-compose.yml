@@ -20,6 +20,7 @@ services:
       - MAX_CLIPBOARD_SIZE_MB=${MAX_CLIPBOARD_SIZE_MB:-5}
       - WEB_DIST_PATH=/app/web/dist
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
     volumes:
       - uploads:/app/uploads
       - db:/app/data

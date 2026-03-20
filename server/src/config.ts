@@ -14,6 +14,7 @@ function required(key: string, fallback?: string): string {
 export const config = {
   PORT: parseInt(process.env['PORT'] ?? '3010', 10),
   GOOGLE_CLIENT_ID: process.env['GOOGLE_CLIENT_ID'] ?? '',
+  GOOGLE_CLIENT_SECRET: process.env['GOOGLE_CLIENT_SECRET'] ?? '',
   DATABASE_URL: process.env['DATABASE_URL'] ?? path.resolve('./data/modushare.db'),
   JWT_SECRET: required('JWT_SECRET', 'dev-secret-change-in-production'),
   JWT_ACCESS_EXPIRY: process.env['JWT_ACCESS_EXPIRY'] ?? '15m',
