@@ -48,7 +48,7 @@ export const userSessions = {
         'SELECT sync_enabled FROM users WHERE id = ?'
       )
       .get(userId);
-    return row?.sync_enabled === 1 ?? false;
+    return (row?.sync_enabled === 1) ?? false;
   },
 
   getSessionCount(userId: string): number {
