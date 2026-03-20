@@ -92,6 +92,8 @@ export function setupIpcHandlers(
         });
         authWin.loadURL(authUrl);
 
+        let resolved = false;
+
         const cleanup = () => {
           localServer.close();
           if (!authWin.isDestroyed()) authWin.close();
@@ -99,7 +101,10 @@ export function setupIpcHandlers(
 
         authWin.on('closed', () => {
           localServer.close();
-          resolve({ ok: false, error: '로그인이 취소됐습니다.' });
+          if (!resolved) {
+            resolved = true;
+            resolve({ ok: false, error: '로그인이 취소됐습니다.' });
+          }
         });
 
         // 4. redirect_uri로 code 수신
@@ -112,6 +117,7 @@ export function setupIpcHandlers(
           res.end('<html><body><p>로그인 완료. 이 창을 닫아도 됩니다.</p><script>window.close()</script></body></html>');
 
           if (!code || error) {
+            resolved = true;
             cleanup();
             resolve({ ok: false, error: error ?? '인증 코드를 받지 못했습니다.' });
             return;
@@ -129,10 +135,12 @@ export function setupIpcHandlers(
             poller.start();
             const loginWin = getLoginWindow();
             if (loginWin && !loginWin.isDestroyed()) loginWin.close();
+            resolved = true;
             cleanup();
             resolve({ ok: true, user: data.user });
           } catch (err: unknown) {
             const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Google 로그인 실패';
+            resolved = true;
             cleanup();
             resolve({ ok: false, error: msg });
           }
