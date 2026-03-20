@@ -1,6 +1,6 @@
 {
   "name": "modushare-windows",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "ModuShare Desktop client (Electron)",
   "main": "dist/electron/main.js",
   "scripts": {
