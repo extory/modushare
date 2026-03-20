@@ -6,7 +6,6 @@ import { SyncToggle } from './components/SyncToggle';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useClipboardStore } from './store/clipboardStore';
 import { endpoints } from './api/endpoints';
-import { getAccessToken } from './api/client';
 import { User, ClipboardItem } from './types';
 import { WSMessage, ClipboardUpdatePayload } from '@modushare/shared';
 
