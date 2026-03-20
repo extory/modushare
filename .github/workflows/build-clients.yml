@@ -3,11 +3,11 @@ name: Build Desktop Clients
 on:
   push:
     tags:
-      - 'v*'           # v1.0.0 같은 태그 push 시 빌드 + Release
-  workflow_dispatch:    # GitHub UI에서 수동 실행 가능
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
-  # ── Windows .exe (nsis installer) ──────────────────────────────────────────
+  # ── Windows .exe ────────────────────────────────────────────────────────────
   build-windows:
     runs-on: windows-latest
 
@@ -17,15 +17,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
 
-      - name: Install root workspace deps
-        run: npm install --ignore-scripts
-
-      - name: Install client deps
+      - name: Install dependencies
         working-directory: clients/windows
-        run: npm install --ignore-scripts
+        run: npm install
 
       - name: Generate icons from SVG
         working-directory: clients/windows
@@ -55,7 +50,7 @@ jobs:
           name: ModuShare-Windows
           path: clients/windows/release/*.exe
 
-  # ── macOS .dmg ─────────────────────────────────────────────────────────────
+  # ── macOS .dmg ──────────────────────────────────────────────────────────────
   build-macos:
     runs-on: macos-latest
 
@@ -65,15 +60,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
 
-      - name: Install root workspace deps
-        run: npm install --ignore-scripts
-
-      - name: Install client deps
+      - name: Install dependencies
         working-directory: clients/windows
-        run: npm install --ignore-scripts
+        run: npm install
 
       - name: Generate icons from SVG
         working-directory: clients/windows
@@ -93,6 +83,7 @@ jobs:
         run: npx electron-builder --mac --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -100,7 +91,7 @@ jobs:
           name: ModuShare-macOS
           path: clients/windows/release/*.dmg
 
-  # ── GitHub Release에 업로드 (태그 push 시에만) ─────────────────────────────
+  # ── GitHub Release ───────────────────────────────────────────────────────────
   release:
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
