@@ -67,9 +67,16 @@ export function createTray(
       `ModuShare – ${isConnected ? 'Connected' : 'Disconnected'} | Sync: ${syncEnabled ? 'ON' : 'OFF'}`
     );
 
+    const userEmail = store.get('userEmail');
+    const accountLabel = userEmail ? userEmail : 'Sign In / Account';
+
     const menu = Menu.buildFromTemplate([
       {
         label: 'ModuShare',
+        enabled: false,
+      },
+      {
+        label: userEmail ? `계정: ${userEmail}` : '로그인 안됨',
         enabled: false,
       },
       { type: 'separator' },

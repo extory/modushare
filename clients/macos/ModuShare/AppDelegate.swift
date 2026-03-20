@@ -87,6 +87,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Account
         if AuthManager.shared.isAuthenticated {
+            let emailItem = NSMenuItem(
+                title: AuthManager.shared.userEmail ?? "로그인됨",
+                action: nil,
+                keyEquivalent: ""
+            )
+            emailItem.isEnabled = false
+            menu.addItem(emailItem)
             menu.addItem(withTitle: "Sign Out", action: #selector(signOut), keyEquivalent: "")
         } else {
             menu.addItem(withTitle: "Sign In…", action: #selector(showLoginWindowAction), keyEquivalent: "")

@@ -32,6 +32,7 @@ export function setupIpcHandlers(
           { email, password }
         );
         store.set('accessToken', data.accessToken);
+        store.set('userEmail', data.user.email);
 
         // Connect WS and start polling after successful login
         wsClient.connect();
@@ -122,6 +123,7 @@ export function setupIpcHandlers(
               { code, redirectUri }
             );
             store.set('accessToken', data.accessToken);
+            store.set('userEmail', data.user.email);
             wsClient.connect();
             poller.start();
             const loginWin = getLoginWindow();
@@ -228,6 +230,7 @@ export function setupIpcHandlers(
       // best-effort
     }
     store.set('accessToken', '');
+    store.set('userEmail', '');
     wsClient.disconnect();
     poller.stop();
     return { ok: true };

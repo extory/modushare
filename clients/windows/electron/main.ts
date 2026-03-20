@@ -12,6 +12,7 @@ export interface AppStore {
   refreshToken: string;
   syncEnabled: boolean;
   deviceId: string;
+  userEmail: string;
 }
 
 // ─── Electron store ───────────────────────────────────────────────────────────
@@ -22,6 +23,7 @@ export const store = new Store<AppStore>({
     refreshToken: '',
     syncEnabled: true,
     deviceId: require('uuid').v4(),
+    userEmail: '',
   },
 });
 

@@ -80,6 +80,14 @@ class AuthManager {
         }
     }
 
+    var userEmail: String? {
+        get { Keychain.load(key: "user_email") }
+        set {
+            if let v = newValue { Keychain.save(key: "user_email", value: v) }
+            else { Keychain.delete(key: "user_email") }
+        }
+    }
+
     var isAuthenticated: Bool { accessToken != nil && !(accessToken!.isEmpty) }
 
     // ── Server URL ────────────────────────────────────────────────────────────
@@ -109,6 +117,7 @@ class AuthManager {
 
         let result = try JSONDecoder().decode(LoginResponse.self, from: data)
         accessToken = result.accessToken
+        userEmail = result.user.email
         return result.user
     }
 
@@ -149,7 +158,9 @@ class AuthManager {
         var req = URLRequest(url: url)
         req.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
         let (data, _) = try await URLSession.shared.data(for: req)
-        return try JSONDecoder().decode(UserDTO.self, from: data)
+        let user = try JSONDecoder().decode(UserDTO.self, from: data)
+        userEmail = user.email
+        return user
     }
 
     // ── Logout ────────────────────────────────────────────────────────────────
@@ -163,5 +174,6 @@ class AuthManager {
             try? await URLSession.shared.data(for: request)
         }
         accessToken = nil
+        userEmail = nil
     }
 }
