@@ -132,6 +132,26 @@ class AuthManager {
         accessToken = result.accessToken
     }
 
+    // ── Google Login ──────────────────────────────────────────────────────────
+
+    /// GoogleAuthHelper가 이미 서버와 통신해서 토큰을 받아왔으므로 저장만 합니다.
+    func setTokenFromGoogle(_ token: String) {
+        accessToken = token
+    }
+
+    /// LoginViewController에서 호출 — GoogleAuthHelper가 내부적으로 처리하므로 여기선 단순 래퍼
+    func loginWithGoogle(credential: String) async throws -> UserDTO {
+        // credential은 accessToken (GoogleAuthHelper에서 이미 서버 호출 완료)
+        // accessToken은 setTokenFromGoogle에서 저장됨
+        guard let url = URL(string: "\(serverURL)/auth/me") else {
+            throw URLError(.badURL)
+        }
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        return try JSONDecoder().decode(UserDTO.self, from: data)
+    }
+
     // ── Logout ────────────────────────────────────────────────────────────────
 
     func logout() async {

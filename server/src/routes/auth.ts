@@ -21,34 +21,64 @@ const googleClient = new OAuth2Client(config.GOOGLE_CLIENT_ID);
 
 const router = Router();
 
+// ─── GET /auth/google-client-id ───────────────────────────────────────────────
+router.get('/google-client-id', (_req: Request, res: Response) => {
+  res.json({ googleClientId: config.GOOGLE_CLIENT_ID || null });
+});
+
 // ─── POST /auth/google ────────────────────────────────────────────────────────
+// 두 가지 방식 지원:
+//   1. { credential } — 웹 GSI ID Token (기존)
+//   2. { code, redirectUri } — Electron Authorization Code Flow (신규)
 router.post(
   '/google',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { credential } = req.body as { credential?: string };
-      if (!credential) {
-        res.status(400).json({ error: 'Google credential is required' });
-        return;
-      }
-
       if (!config.GOOGLE_CLIENT_ID) {
         res.status(503).json({ error: 'Google login is not configured' });
         return;
       }
 
-      // Verify ID token with Google
-      const ticket = await googleClient.verifyIdToken({
-        idToken: credential,
-        audience: config.GOOGLE_CLIENT_ID,
-      });
-      const payload = ticket.getPayload();
-      if (!payload?.email) {
-        res.status(401).json({ error: 'Invalid Google token' });
+      const body = req.body as { credential?: string; code?: string; redirectUri?: string };
+      let googleId: string;
+      let email: string;
+      let name: string | undefined;
+      let picture: string | undefined;
+
+      if (body.credential) {
+        // 웹 방식: ID Token 검증
+        const ticket = await googleClient.verifyIdToken({
+          idToken: body.credential,
+          audience: config.GOOGLE_CLIENT_ID,
+        });
+        const p = ticket.getPayload();
+        if (!p?.email || !p?.sub) {
+          res.status(401).json({ error: 'Invalid Google token' });
+          return;
+        }
+        googleId = p.sub; email = p.email; name = p.name ?? undefined; picture = p.picture ?? undefined;
+      } else if (body.code && body.redirectUri) {
+        // Electron 방식: Authorization Code → ID Token 교환
+        const codeClient = new OAuth2Client(config.GOOGLE_CLIENT_ID, undefined, body.redirectUri);
+        const { tokens } = await codeClient.getToken(body.code);
+        if (!tokens.id_token) {
+          res.status(401).json({ error: 'Failed to get ID token from Google' });
+          return;
+        }
+        const ticket = await codeClient.verifyIdToken({
+          idToken: tokens.id_token,
+          audience: config.GOOGLE_CLIENT_ID,
+        });
+        const p = ticket.getPayload();
+        if (!p?.email || !p?.sub) {
+          res.status(401).json({ error: 'Invalid Google token' });
+          return;
+        }
+        googleId = p.sub; email = p.email; name = p.name ?? undefined; picture = p.picture ?? undefined;
+      } else {
+        res.status(400).json({ error: 'credential or code+redirectUri is required' });
         return;
       }
-
-      const { sub: googleId, email, name, picture } = payload;
 
       // Find existing user by google_id or email
       let user = db

@@ -34,6 +34,20 @@
     <dict>
         <key>NSAllowsLocalNetworking</key>
         <true/>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
     </dict>
+    <!-- Google OAuth custom URL scheme -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.modushare.oauth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>modushare</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
