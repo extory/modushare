@@ -22,10 +22,6 @@ jobs:
         working-directory: clients/windows
         run: npm install
 
-      - name: Generate icons from SVG
-        working-directory: clients/windows
-        run: npx electron-icon-builder --input=assets/icon.svg --output=assets
-
       - name: Set production server URL
         working-directory: clients/windows
         shell: pwsh
@@ -64,10 +60,6 @@ jobs:
       - name: Install dependencies
         working-directory: clients/windows
         run: npm install
-
-      - name: Generate icons from SVG
-        working-directory: clients/windows
-        run: npx electron-icon-builder --input=assets/icon.svg --output=assets
 
       - name: Set production server URL
         working-directory: clients/windows
