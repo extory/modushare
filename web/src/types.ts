@@ -28,3 +28,10 @@ export interface HistoryResponse {
   limit: number;
   offset: number;
 }
+
+export interface SharePartner {
+  id: string;
+  userId: string;
+  username: string;
+  email: string;
+}

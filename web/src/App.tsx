@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { LoginForm } from './components/LoginForm';
 import { ClipboardFeed } from './components/ClipboardFeed';
 import { SyncToggle } from './components/SyncToggle';
+import { ShareManager } from './components/ShareManager';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useClipboardStore } from './store/clipboardStore';
 import { endpoints } from './api/endpoints';
@@ -168,6 +169,7 @@ export default function App() {
             title={isConnected ? 'Connected' : 'Reconnecting…'}
           />
           <SyncToggle enabled={syncEnabled} onToggle={handleSyncToggle} />
+          <ShareManager />
           <span style={styles.username}>{user.username}</span>
           <button style={styles.logoutBtn} onClick={handleLogout}>
             Sign Out

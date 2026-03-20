@@ -1,5 +1,5 @@
 import { apiClient, setAccessToken } from './client';
-import { LoginResponse, HistoryResponse } from '../types';
+import { LoginResponse, HistoryResponse, SharePartner } from '../types';
 
 export const endpoints = {
   async login(email: string, password: string): Promise<LoginResponse> {
@@ -48,6 +48,20 @@ export const endpoints = {
 
   async deleteItem(id: string): Promise<void> {
     await apiClient.delete(`/clipboard/${id}`);
+  },
+
+  async getSharePartners(): Promise<{ partners: SharePartner[] }> {
+    const { data } = await apiClient.get<{ partners: SharePartner[] }>('/share');
+    return data;
+  },
+
+  async addSharePartner(email: string): Promise<SharePartner> {
+    const { data } = await apiClient.post<SharePartner>('/share', { email });
+    return data;
+  },
+
+  async removeSharePartner(targetId: string): Promise<void> {
+    await apiClient.delete(`/share/${targetId}`);
   },
 
   async uploadImage(blob: Blob): Promise<{ imageUrl: string }> {

@@ -80,6 +80,52 @@ export function setupIpcHandlers(
     }
   );
 
+  // ── Share: list ────────────────────────────────────────────────────────────
+  ipcMain.handle('share:list', async () => {
+    const serverUrl = store.get('serverUrl');
+    const token = store.get('accessToken');
+    try {
+      const { data } = await axios.get(`${serverUrl}/share`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return { ok: true, partners: data.partners };
+    } catch {
+      return { ok: false, partners: [] };
+    }
+  });
+
+  // ── Share: add ─────────────────────────────────────────────────────────────
+  ipcMain.handle('share:add', async (_event, email: string) => {
+    const serverUrl = store.get('serverUrl');
+    const token = store.get('accessToken');
+    try {
+      const { data } = await axios.post(
+        `${serverUrl}/share`,
+        { email },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return { ok: true, partner: data };
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? '추가 실패';
+      return { ok: false, error: message };
+    }
+  });
+
+  // ── Share: remove ──────────────────────────────────────────────────────────
+  ipcMain.handle('share:remove', async (_event, targetId: string) => {
+    const serverUrl = store.get('serverUrl');
+    const token = store.get('accessToken');
+    try {
+      await axios.delete(`${serverUrl}/share/${targetId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  });
+
   // ── Logout ─────────────────────────────────────────────────────────────────
   ipcMain.handle('auth:logout', async () => {
     const serverUrl = store.get('serverUrl');

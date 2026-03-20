@@ -98,8 +98,22 @@ export async function handleClipboardUpdate(
 
   userSessions.broadcastToUser(userId, message, senderWs);
 
+  // Broadcast to share partners (users who have added this user as a target)
+  const partnerRows = db
+    .prepare<string[], { user_id: string }>(
+      'SELECT user_id FROM share_pairs WHERE target_id = ?'
+    )
+    .all(userId);
+  for (const { user_id } of partnerRows) {
+    userSessions.broadcastToUser(user_id, message);
+  }
+
   // Send ack to sender (include how many other devices received the update)
-  const sharedWithCount = userSessions.getSessionCount(userId) - 1; // exclude sender
+  const partnerSessionCount = partnerRows.reduce(
+    (sum, { user_id }) => sum + userSessions.getSessionCount(user_id),
+    0
+  );
+  const sharedWithCount = userSessions.getSessionCount(userId) - 1 + partnerSessionCount; // exclude sender
   const ack: WSMessage<{ itemId: string; sharedWithCount: number }> = {
     type: 'CLIPBOARD_ACK',
     payload: { itemId: item.id, sharedWithCount: Math.max(0, sharedWithCount) },

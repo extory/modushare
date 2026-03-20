@@ -6,6 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var syncManager: SyncManager!
     private var loginWindowController: NSWindowController?
+    private var sharePrefsWindowController: NSWindowController?
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // Hide from Dock (also set via LSUIElement in Info.plist)
@@ -78,6 +79,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(withTitle: "Enable Sync", action: #selector(enableSync), keyEquivalent: "")
         }
 
+        if AuthManager.shared.isAuthenticated {
+            menu.addItem(withTitle: "공유 관리…", action: #selector(showSharePreferences), keyEquivalent: "")
+        }
+
         menu.addItem(.separator())
 
         // Account
@@ -124,6 +129,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showLoginWindowAction() {
         showLoginWindow()
+    }
+
+    @objc private func showSharePreferences() {
+        if sharePrefsWindowController == nil {
+            let vc = SharePreferencesViewController()
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 440, height: 380),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "ModuShare – 공유 관리"
+            window.contentViewController = vc
+            window.center()
+            sharePrefsWindowController = NSWindowController(window: window)
+        }
+        sharePrefsWindowController?.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc private func signOut() {

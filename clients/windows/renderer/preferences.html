@@ -23,7 +23,7 @@
     .section-title { font-size: 0.75rem; font-weight: 600; color: #888; text-transform: uppercase; margin-bottom: 0.75rem; }
     .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 0.75rem; }
     label { font-size: 0.8rem; font-weight: 500; color: #444; }
-    input[type="text"], input[type="url"] {
+    input[type="text"], input[type="url"], input[type="email"] {
       padding: 0.5rem 0.625rem;
       border-radius: 7px;
       border: 1px solid #d1d1d6;
@@ -61,6 +61,19 @@
     .toggle input:checked + .slider { background: #6366f1; }
     .toggle input:checked + .slider::before { transform: translateX(20px); }
 
+    /* Share partners */
+    .add-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .add-row input { flex: 1; }
+    .partner-list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+    .partner-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #f5f5f7; border-radius: 8px; padding: 0.5rem 0.625rem;
+    }
+    .partner-info { display: flex; flex-direction: column; gap: 2px; }
+    .partner-name { font-size: 0.875rem; font-weight: 500; }
+    .partner-email { font-size: 0.75rem; color: #888; }
+    .empty-msg { font-size: 0.85rem; color: #aaa; text-align: center; padding: 0.75rem 0; }
+
     .actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
     button {
       padding: 0.6rem 1.25rem;
@@ -73,8 +86,10 @@
       transition: background 0.15s;
     }
     button.primary { background: #6366f1; color: #fff; border-color: #6366f1; }
+    button.small { padding: 0.3rem 0.75rem; font-size: 0.8rem; }
     button.danger { border-color: #fca5a5; color: #ef4444; }
     .status { font-size: 0.8rem; color: #22c55e; margin-top: 0.5rem; display: none; }
+    .error-msg { font-size: 0.8rem; color: #ef4444; margin-bottom: 0.25rem; display: none; }
   </style>
 </head>
 <body>
@@ -84,7 +99,7 @@
     <div class="section-title">Server</div>
     <div class="field">
       <label for="serverUrl">Server URL</label>
-      <input type="url" id="serverUrl" placeholder="http://localhost:3000" />
+      <input type="url" id="serverUrl" placeholder="http://localhost:3010" />
     </div>
   </div>
 
@@ -97,6 +112,18 @@
         <span class="slider"></span>
       </label>
     </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">공유 대상</div>
+    <div class="add-row">
+      <input type="email" id="shareEmail" placeholder="공유할 이메일 입력" />
+      <button class="primary small" id="addShareBtn">추가</button>
+    </div>
+    <p class="error-msg" id="shareError"></p>
+    <ul class="partner-list" id="partnerList">
+      <li class="empty-msg" id="emptyMsg">공유 중인 대상이 없습니다</li>
+    </ul>
   </div>
 
   <div class="actions">
@@ -113,6 +140,64 @@
       document.getElementById('serverUrl').value = s.serverUrl || '';
       document.getElementById('syncEnabled').checked = s.syncEnabled;
     }
+
+    async function loadPartners() {
+      const result = await ipcRenderer.invoke('share:list');
+      renderPartners(result.partners || []);
+    }
+
+    function renderPartners(partners) {
+      const list = document.getElementById('partnerList');
+      const empty = document.getElementById('emptyMsg');
+      // Remove existing partner items (keep emptyMsg)
+      [...list.querySelectorAll('.partner-item')].forEach(el => el.remove());
+
+      if (partners.length === 0) {
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+        partners.forEach(p => {
+          const li = document.createElement('li');
+          li.className = 'partner-item';
+          li.dataset.userId = p.userId;
+          li.innerHTML = `
+            <div class="partner-info">
+              <span class="partner-name">${escHtml(p.username)}</span>
+              <span class="partner-email">${escHtml(p.email)}</span>
+            </div>
+            <button class="small danger remove-btn">제거</button>
+          `;
+          li.querySelector('.remove-btn').addEventListener('click', async () => {
+            await ipcRenderer.invoke('share:remove', p.userId);
+            li.remove();
+            if (list.querySelectorAll('.partner-item').length === 0) {
+              empty.style.display = 'block';
+            }
+          });
+          list.appendChild(li);
+        });
+      }
+    }
+
+    function escHtml(str) {
+      return str.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    document.getElementById('addShareBtn').addEventListener('click', async () => {
+      const email = document.getElementById('shareEmail').value.trim();
+      const errEl = document.getElementById('shareError');
+      errEl.style.display = 'none';
+      if (!email) return;
+
+      const result = await ipcRenderer.invoke('share:add', email);
+      if (result.ok) {
+        document.getElementById('shareEmail').value = '';
+        loadPartners();
+      } else {
+        errEl.textContent = result.error || '추가 실패';
+        errEl.style.display = 'block';
+      }
+    });
 
     document.getElementById('saveBtn').addEventListener('click', async () => {
       const serverUrl = document.getElementById('serverUrl').value.trim();
@@ -131,6 +216,7 @@
     });
 
     loadSettings();
+    loadPartners();
   </script>
 </body>
 </html>
