@@ -31,6 +31,7 @@ class GoogleAuthHelper: NSObject {
     private static var authWindow: NSWindow?
     private static var localServer: LocalHTTPServer?
     private static var continuation: CheckedContinuation<String, Error>?
+    private static var closeObserver: NSObjectProtocol?
 
     static func signIn(serverURL: String) async throws -> String {
         // 1. 서버에서 Google Client ID 가져오기
@@ -69,7 +70,11 @@ class GoogleAuthHelper: NSObject {
 
             server.onCode = { code in
                 Task { @MainActor in
-                    // continuation을 임시 보관 후 nil 처리 → willClose 취소 이벤트 차단
+                    // 옵저버 제거 후 창 닫기 → 취소 이벤트 차단
+                    if let obs = self.closeObserver {
+                        NotificationCenter.default.removeObserver(obs)
+                        self.closeObserver = nil
+                    }
                     let cont = self.continuation
                     self.continuation = nil
                     self.authWindow?.close()
@@ -95,8 +100,8 @@ class GoogleAuthHelper: NSObject {
             win.isReleasedWhenClosed = false
             self.authWindow = win
 
-            // 창 닫기 = 취소
-            NotificationCenter.default.addObserver(
+            // 창 닫기 = 취소 (옵저버 토큰 저장)
+            self.closeObserver = NotificationCenter.default.addObserver(
                 forName: NSWindow.willCloseNotification,
                 object: win,
                 queue: .main
@@ -107,6 +112,7 @@ class GoogleAuthHelper: NSObject {
                     self.continuation?.resume(throwing: GoogleAuthError.cancelled)
                     self.continuation = nil
                 }
+                self.closeObserver = nil
             }
 
             win.makeKeyAndOrderFront(nil)
