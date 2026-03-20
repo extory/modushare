@@ -8,7 +8,7 @@ set -euo pipefail
 
 DOMAIN="modushare.extory.co"
 APP_DIR="/opt/modushare"
-REPO_URL=""   # git clone 사용 시 채워주세요 (또는 scp로 업로드)
+REPO_URL="https://github.com/extory/modushare.git"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 log()  { echo -e "${GREEN}[modushare]${NC} $*"; }
@@ -48,19 +48,13 @@ ufw allow 80/tcp
 ufw allow 443/tcp
 # 내부 포트(3001, 3010)는 외부에 노출하지 않음
 
-# ── 5. 앱 디렉터리 준비 ──────────────────────────────────────
-log "앱 디렉터리 준비: $APP_DIR"
-mkdir -p "$APP_DIR"
-
-if [[ -n "$REPO_URL" ]]; then
-  if [[ -d "$APP_DIR/.git" ]]; then
-    git -C "$APP_DIR" pull
-  else
-    git clone "$REPO_URL" "$APP_DIR"
-  fi
+# ── 5. 소스 클론 ─────────────────────────────────────────────
+log "소스 코드 clone 중: $REPO_URL"
+if [[ -d "$APP_DIR/.git" ]]; then
+  log "이미 clone 되어 있음. pull 로 업데이트..."
+  git -C "$APP_DIR" pull
 else
-  warn "REPO_URL이 비어 있습니다. 파일을 수동으로 $APP_DIR 에 업로드하세요."
-  warn "예: scp -r ./modushare root@35.184.146.218:/opt/modushare"
+  git clone "$REPO_URL" "$APP_DIR"
 fi
 
 # ── 6. .env 설정 ─────────────────────────────────────────────
@@ -75,21 +69,14 @@ MAX_CLIPBOARD_SIZE_MB=5
 WEB_DIST_PATH=/app/web/dist
 EOF
   log ".env 생성 완료 (JWT_SECRET 자동 생성됨)"
-  log "파일 위치: $APP_DIR/.env"
 else
   warn ".env 파일이 이미 존재합니다. 덮어쓰지 않습니다."
 fi
 
 # ── 7. Nginx 설정 ────────────────────────────────────────────
-log "Nginx 설정 복사 중..."
-cp "$APP_DIR/deploy/nginx/$DOMAIN.conf" "/etc/nginx/sites-available/$DOMAIN.conf"
-ln -sf "/etc/nginx/sites-available/$DOMAIN.conf" "/etc/nginx/sites-enabled/$DOMAIN.conf"
+log "Nginx 설정 적용 중..."
 
-# 기본 nginx 사이트 비활성화
-rm -f /etc/nginx/sites-enabled/default
-
-# SSL 발급 전 임시로 HTTP만 허용하는 설정으로 교체 (certbot 필요)
-log "SSL 인증서 발급 전 임시 HTTP 설정 적용..."
+# SSL 발급 전 임시 HTTP 설정
 cat > "/etc/nginx/sites-available/$DOMAIN.conf" <<'NGINX_TEMP'
 server {
     listen 80;
@@ -112,11 +99,14 @@ server {
 }
 NGINX_TEMP
 
+ln -sf "/etc/nginx/sites-available/$DOMAIN.conf" "/etc/nginx/sites-enabled/$DOMAIN.conf"
+rm -f /etc/nginx/sites-enabled/default
+
 nginx -t && systemctl reload nginx
 log "Nginx 임시 설정 완료"
 
 # ── 8. Docker 이미지 빌드 및 실행 ────────────────────────────
-log "Docker 이미지 빌드 중 (시간이 걸릴 수 있습니다)..."
+log "Docker 이미지 빌드 중 (첫 빌드는 5~10분 소요)..."
 cd "$APP_DIR"
 docker compose build
 
@@ -129,11 +119,11 @@ docker compose ps
 # ── 9. SSL 인증서 발급 ───────────────────────────────────────
 log "Let's Encrypt SSL 인증서 발급 중..."
 certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "admin@extory.co" || {
-  warn "SSL 발급 실패. 도메인 DNS가 이 서버를 가리키는지 확인하세요."
-  warn "수동 발급: certbot --nginx -d $DOMAIN"
+  warn "SSL 발급 실패. DNS가 이 서버를 가리키는지 확인 후 아래 명령어로 재시도하세요:"
+  warn "  certbot --nginx -d $DOMAIN"
 }
 
-# ── 10. 자동 갱신 설정 ───────────────────────────────────────
+# ── 10. SSL 자동 갱신 크론 등록 ──────────────────────────────
 if ! crontab -l 2>/dev/null | grep -q certbot; then
   (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet && systemctl reload nginx") | crontab -
   log "SSL 자동 갱신 크론 등록 완료"
