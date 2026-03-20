@@ -1,0 +1,38 @@
+{
+  "name": "modushare-windows",
+  "version": "1.0.0",
+  "description": "ModuShare Windows client (Electron)",
+  "main": "dist/electron/main.js",
+  "scripts": {
+    "dev": "tsc && electron dist/electron/main.js",
+    "build": "tsc && electron-builder",
+    "build:tsc": "tsc"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "electron-store": "^8.1.0",
+    "uuid": "^9.0.1",
+    "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/uuid": "^9.0.8",
+    "@types/ws": "^8.5.10",
+    "electron": "^30.0.1",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.4.5"
+  },
+  "build": {
+    "appId": "com.modushare.windows",
+    "productName": "ModuShare",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "files": [
+      "dist/**/*",
+      "renderer/**/*",
+      "assets/**/*"
+    ]
+  }
+}

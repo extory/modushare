@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  modushare:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: modushare
+    ports:
+      - "3010:3010"
+    environment:
+      - NODE_ENV=production
+      - PORT=3010
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_URL=/app/data/modushare.db
+      - UPLOAD_DIR=/app/uploads
+      - CORS_ORIGIN=https://modushare.extory.co
+      - MAX_CLIPBOARD_SIZE_MB=${MAX_CLIPBOARD_SIZE_MB:-5}
+      - WEB_DIST_PATH=/app/web/dist
+    volumes:
+      - uploads:/app/uploads
+      - db:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3010/auth/me"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  uploads:
+    driver: local
+  db:
+    driver: local

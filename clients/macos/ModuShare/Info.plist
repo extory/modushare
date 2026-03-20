@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.modushare.app</string>
+    <key>CFBundleName</key>
+    <string>ModuShare</string>
+    <key>CFBundleDisplayName</key>
+    <string>ModuShare</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleExecutable</key>
+    <string>ModuShare</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <!-- Hide from Dock – run as menu-bar-only app -->
+    <key>LSUIElement</key>
+    <true/>
+    <!-- Minimum macOS version: Ventura (13.0) -->
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2024 ModuShare. All rights reserved.</string>
+    <!-- Required for clipboard access -->
+    <key>NSPasteboardUsageDescription</key>
+    <string>ModuShare reads and writes your clipboard to sync content across devices.</string>
+    <!-- Required for outbound network access -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+</dict>
+</plist>

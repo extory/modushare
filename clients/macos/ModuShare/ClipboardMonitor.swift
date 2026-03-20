@@ -1,0 +1,78 @@
+import Cocoa
+import CryptoKit
+
+struct ClipboardContent {
+    let contentType: String  // "text" or "image"
+    let text: String?
+    let imageData: Data?     // PNG data
+}
+
+class ClipboardMonitor {
+
+    var onChange: ((ClipboardContent) -> Void)?
+
+    private var lastChangeCount: Int = NSPasteboard.general.changeCount
+    private var lastContentHash: String = ""
+    private var timer: Timer?
+
+    /// Set this from outside (e.g. SyncManager) when a remote clipboard update
+    /// was just written locally, to prevent echo.
+    var lastReceivedHash: String = ""
+
+    // MARK: – Lifecycle
+
+    func start() {
+        guard timer == nil else { return }
+        // Seed current state
+        lastChangeCount = NSPasteboard.general.changeCount
+        timer = Timer.scheduledTimer(
+            withTimeInterval: 0.5,
+            repeats: true
+        ) { [weak self] _ in
+            self?.poll()
+        }
+        RunLoop.main.add(timer!, forMode: .common)
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    // MARK: – Polling
+
+    private func poll() {
+        let pasteboard = NSPasteboard.general
+        let currentChangeCount = pasteboard.changeCount
+        guard currentChangeCount != lastChangeCount else { return }
+        lastChangeCount = currentChangeCount
+
+        if let text = pasteboard.string(forType: .string), !text.isEmpty {
+            let hash = sha256(Data(text.utf8))
+            guard hash != lastReceivedHash else {
+                lastReceivedHash = ""
+                return
+            }
+            lastContentHash = hash
+            onChange?(ClipboardContent(contentType: "text", text: text, imageData: nil))
+
+        } else if let image = pasteboard.data(forType: .tiff),
+                  let tiff = NSBitmapImageRep(data: image),
+                  let pngData = tiff.representation(using: .png, properties: [:]) {
+            let hash = sha256(pngData)
+            guard hash != lastReceivedHash else {
+                lastReceivedHash = ""
+                return
+            }
+            lastContentHash = hash
+            onChange?(ClipboardContent(contentType: "image", text: nil, imageData: pngData))
+        }
+    }
+
+    // MARK: – Helpers
+
+    private func sha256(_ data: Data) -> String {
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+}

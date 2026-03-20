@@ -1,0 +1,22 @@
+{
+  "name": "modushare",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "server",
+    "web",
+    "clients/windows"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --workspace=server",
+    "dev:web": "npm run dev --workspace=web",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:web\"",
+    "build:server": "npm run build --workspace=server",
+    "build:web": "npm run build --workspace=web",
+    "build": "npm run build:server && npm run build:web"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
