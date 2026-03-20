@@ -112,10 +112,32 @@ export function createTray(
         enabled: false,
       },
       { type: 'separator' },
-      {
-        label: 'Sign In / Account',
-        click: () => openLoginWindow(),
-      },
+      ...(store.get('accessToken')
+        ? [
+            {
+              label: 'Sign Out',
+              click: async () => {
+                const { ipcMain } = require('electron');
+                const serverUrl = store.get('serverUrl');
+                const token = store.get('accessToken');
+                try {
+                  const axios = require('axios');
+                  await axios.post(`${serverUrl}/auth/logout`, {}, { headers: { Authorization: `Bearer ${token}` } });
+                } catch {}
+                store.set('accessToken', '');
+                store.set('userEmail', '');
+                wsClient.disconnect();
+                poller.stop();
+                updateMenu();
+              },
+            },
+          ]
+        : [
+            {
+              label: 'Sign In…',
+              click: () => openLoginWindow(),
+            },
+          ]),
       { type: 'separator' },
       {
         label: 'Quit ModuShare',

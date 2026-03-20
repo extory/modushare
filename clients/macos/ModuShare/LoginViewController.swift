@@ -171,12 +171,15 @@ class LoginViewController: NSViewController {
 
         Task {
             do {
-                let token = try await GoogleAuthHelper.signIn(serverURL: AuthManager.shared.serverURL)
-                // token = Google ID token credential
-                let user = try await AuthManager.shared.loginWithGoogle(credential: token)
+                _ = try await GoogleAuthHelper.signIn(serverURL: AuthManager.shared.serverURL)
                 await MainActor.run {
                     self.setLoading(false)
                     self.onLoginSuccess?()
+                }
+            } catch GoogleAuthError.cancelled {
+                // 사용자가 직접 취소한 경우만 에러 표시
+                await MainActor.run {
+                    self.setLoading(false)
                 }
             } catch {
                 await MainActor.run {
