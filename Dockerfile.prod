@@ -3,9 +3,11 @@ FROM node:20-alpine AS web-builder
 
 WORKDIR /app
 
+# 루트 + 각 workspace package.json & lock 파일 복사
 COPY package*.json ./
 COPY shared/package*.json ./shared/
 COPY web/package*.json ./web/
+COPY server/package*.json ./server/
 COPY shared ./shared
 
 RUN npm ci --workspace=web
@@ -26,6 +28,7 @@ RUN apk add --no-cache python3 make g++
 COPY package*.json ./
 COPY shared/package*.json ./shared/
 COPY server/package*.json ./server/
+COPY web/package*.json ./web/
 COPY shared ./shared
 
 RUN npm ci --workspace=server
@@ -46,7 +49,7 @@ COPY --from=server-builder /app/server/node_modules ./server/node_modules
 COPY --from=server-builder /app/server/dist ./server/dist
 COPY server/package.json ./server/
 
-# Shared types (referenced at runtime)
+# Shared types
 COPY --from=server-builder /app/shared ./shared
 
 # Web static files (served by Express in production)
