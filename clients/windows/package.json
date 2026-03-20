@@ -26,10 +26,15 @@
     "electron-icon-builder": "^2.0.1",
     "typescript": "^5.4.5"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/extory/modushare"
+  },
   "build": {
     "appId": "co.extory.modushare",
     "productName": "ModuShare",
     "copyright": "Copyright © 2025 Extory",
+    "publish": null,
     "directories": {
       "output": "release"
     },
