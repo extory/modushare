@@ -44,11 +44,12 @@ class GoogleAuthHelper: NSObject {
             throw GoogleAuthError.serverNotConfigured
         }
 
-        // 2. 임시 로컬 HTTP 서버 시작
+        // 2. 고정 포트로 로컬 HTTP 서버 시작
+        let fixedPort = 9842
         let server = LocalHTTPServer()
-        let port = try server.start()
+        try server.start(port: fixedPort)
         self.localServer = server
-        let redirectUri = "http://127.0.0.1:\(port)"
+        let redirectUri = "http://127.0.0.1:\(fixedPort)"
 
         // 3. Google 인증 URL
         var comps = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
@@ -146,7 +147,7 @@ class LocalHTTPServer {
     private var serverSocket: Int32 = -1
     var onCode: ((String) -> Void)?
 
-    func start() throws -> Int {
+    func start(port: Int) throws {
         serverSocket = socket(AF_INET, SOCK_STREAM, 0)
         guard serverSocket >= 0 else { throw GoogleAuthError.noCode }
 
@@ -155,7 +156,7 @@ class LocalHTTPServer {
 
         var addr = sockaddr_in()
         addr.sin_family = UInt8(AF_INET)
-        addr.sin_port = 0  // OS가 포트 자동 할당
+        addr.sin_port = UInt16(port).bigEndian
         addr.sin_addr.s_addr = INADDR_ANY
 
         let bindResult = withUnsafeMutablePointer(to: &addr) {
@@ -165,16 +166,6 @@ class LocalHTTPServer {
         }
         guard bindResult == 0 else { throw GoogleAuthError.noCode }
         guard listen(serverSocket, 1) == 0 else { throw GoogleAuthError.noCode }
-
-        // 할당된 포트 확인
-        var boundAddr = sockaddr_in()
-        var addrLen = socklen_t(MemoryLayout<sockaddr_in>.size)
-        withUnsafeMutablePointer(to: &boundAddr) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                getsockname(serverSocket, $0, &addrLen)
-            }
-        }
-        let port = Int(UInt16(bigEndian: boundAddr.sin_port))
 
         // 백그라운드에서 연결 대기
         let sock = serverSocket
@@ -203,8 +194,6 @@ class LocalHTTPServer {
                 }
             }
         }
-
-        return port
     }
 
     func stop() {

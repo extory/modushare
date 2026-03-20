@@ -69,8 +69,9 @@ export function setupIpcHandlers(
     // 2. 임시 로컬 HTTP 서버로 redirect_uri 처리
     return new Promise((resolve) => {
       const localServer = http.createServer();
-      localServer.listen(0, '127.0.0.1', () => {
-        const port = (localServer.address() as { port: number }).port;
+      const fixedPort = 9842;
+      localServer.listen(fixedPort, '127.0.0.1', () => {
+        const port = fixedPort;
         const redirectUri = `http://127.0.0.1:${port}`;
 
         const authUrl =
