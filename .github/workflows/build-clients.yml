@@ -78,12 +78,31 @@ jobs:
         working-directory: clients/windows
         run: npx tsc
 
-      - name: Build macOS DMG
+      - name: Import Developer ID certificate
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          echo "$CSC_LINK" | base64 --decode > /tmp/cert.p12
+          security create-keychain -p "ci_keychain_pass" ci.keychain
+          security default-keychain -s ci.keychain
+          security unlock-keychain -p "ci_keychain_pass" ci.keychain
+          security import /tmp/cert.p12 -k ci.keychain -P "$CSC_KEY_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "ci_keychain_pass" ci.keychain
+          rm /tmp/cert.p12
+
+      - name: Build macOS DMG (signed + notarized)
         working-directory: clients/windows
         run: npx electron-builder --mac --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
