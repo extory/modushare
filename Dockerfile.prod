@@ -1,17 +1,4 @@
-# ── Stage 1: Build shared types ───────────────────────────────────────────────
-FROM node:20-alpine AS shared-builder
-
-WORKDIR /app
-RUN apk add --no-cache python3 make g++
-
-COPY package*.json ./
-COPY shared/package*.json ./shared/
-RUN npm ci --workspace=shared
-
-COPY shared ./shared
-RUN npm run build --workspace=shared 2>/dev/null || true
-
-# ── Stage 2: Build web frontend ───────────────────────────────────────────────
+# ── Stage 1: Build web frontend ───────────────────────────────────────────────
 FROM node:20-alpine AS web-builder
 
 WORKDIR /app
@@ -19,23 +6,18 @@ WORKDIR /app
 COPY package*.json ./
 COPY shared/package*.json ./shared/
 COPY web/package*.json ./web/
-
-# Copy shared build output
-COPY --from=shared-builder /app/shared ./shared
+COPY shared ./shared
 
 RUN npm ci --workspace=web
 
 COPY web ./web
-COPY tsconfig*.json ./
 
-# API calls go to same origin (Nginx will route /api → server, / → web)
-# With unified server, empty string means same-origin
 ENV VITE_API_BASE_URL=""
 ENV VITE_WS_URL=""
 
 RUN npm run build --workspace=web
 
-# ── Stage 3: Build server ─────────────────────────────────────────────────────
+# ── Stage 2: Build server ─────────────────────────────────────────────────────
 FROM node:20-alpine AS server-builder
 
 WORKDIR /app
@@ -44,8 +26,7 @@ RUN apk add --no-cache python3 make g++
 COPY package*.json ./
 COPY shared/package*.json ./shared/
 COPY server/package*.json ./server/
-
-COPY --from=shared-builder /app/shared ./shared
+COPY shared ./shared
 
 RUN npm ci --workspace=server
 
@@ -53,7 +34,7 @@ COPY server ./server
 
 RUN npm run build --workspace=server
 
-# ── Stage 4: Production image ─────────────────────────────────────────────────
+# ── Stage 3: Production image ─────────────────────────────────────────────────
 FROM node:20-alpine
 
 WORKDIR /app
@@ -64,6 +45,9 @@ RUN apk add --no-cache vips-dev wget
 COPY --from=server-builder /app/server/node_modules ./server/node_modules
 COPY --from=server-builder /app/server/dist ./server/dist
 COPY server/package.json ./server/
+
+# Shared types (referenced at runtime)
+COPY --from=server-builder /app/shared ./shared
 
 # Web static files (served by Express in production)
 COPY --from=web-builder /app/web/dist ./web/dist
