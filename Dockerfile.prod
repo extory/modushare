@@ -46,6 +46,7 @@ RUN apk add --no-cache vips-dev wget
 # npm workspace는 node_modules를 루트(/app/node_modules)에 설치
 COPY --from=server-builder /app/node_modules ./node_modules
 COPY --from=server-builder /app/server/dist ./server/dist
+COPY --from=server-builder /app/server/src/db/migrations ./server/dist/db/migrations
 COPY --from=server-builder /app/server/package.json ./server/
 
 # Shared types
