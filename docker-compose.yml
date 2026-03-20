@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod
+      args:
+        - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
     container_name: modushare
     ports:
       - "3010:3010"
@@ -17,6 +19,7 @@ services:
       - CORS_ORIGIN=https://modushare.extory.co
       - MAX_CLIPBOARD_SIZE_MB=${MAX_CLIPBOARD_SIZE_MB:-5}
       - WEB_DIST_PATH=/app/web/dist
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
     volumes:
       - uploads:/app/uploads
       - db:/app/data

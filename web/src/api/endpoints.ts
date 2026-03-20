@@ -25,6 +25,12 @@ export const endpoints = {
     return data;
   },
 
+  async googleLogin(credential: string): Promise<LoginResponse> {
+    const { data } = await apiClient.post<LoginResponse>('/auth/google', { credential });
+    setAccessToken(data.accessToken);
+    return data;
+  },
+
   async logout(): Promise<void> {
     await apiClient.post('/auth/logout');
     setAccessToken(null);

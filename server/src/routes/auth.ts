@@ -1,8 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { OAuth2Client } from 'google-auth-library';
 import db from '../db';
 import { authService } from '../services/authService';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
+import { config } from '../config';
 
 interface UserRow {
   id: string;
@@ -11,9 +13,99 @@ interface UserRow {
   password_hash: string;
   sync_enabled: number;
   created_at: number;
+  google_id: string | null;
+  avatar_url: string | null;
 }
 
+const googleClient = new OAuth2Client(config.GOOGLE_CLIENT_ID);
+
 const router = Router();
+
+// ─── POST /auth/google ────────────────────────────────────────────────────────
+router.post(
+  '/google',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { credential } = req.body as { credential?: string };
+      if (!credential) {
+        res.status(400).json({ error: 'Google credential is required' });
+        return;
+      }
+
+      if (!config.GOOGLE_CLIENT_ID) {
+        res.status(503).json({ error: 'Google login is not configured' });
+        return;
+      }
+
+      // Verify ID token with Google
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: config.GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+      if (!payload?.email) {
+        res.status(401).json({ error: 'Invalid Google token' });
+        return;
+      }
+
+      const { sub: googleId, email, name, picture } = payload;
+
+      // Find existing user by google_id or email
+      let user = db
+        .prepare<string[], UserRow>('SELECT * FROM users WHERE google_id = ?')
+        .get(googleId);
+
+      if (!user) {
+        // Try matching by email (existing account → link Google)
+        user = db
+          .prepare<string[], UserRow>('SELECT * FROM users WHERE email = ?')
+          .get(email);
+
+        if (user) {
+          // Link Google to existing account
+          db.prepare('UPDATE users SET google_id = ?, avatar_url = ? WHERE id = ?').run(
+            googleId, picture ?? null, user.id
+          );
+          user = db.prepare<string[], UserRow>('SELECT * FROM users WHERE id = ?').get(user.id)!;
+        } else {
+          // New user — create account
+          const id = uuidv4();
+          const username = (name ?? email.split('@')[0] ?? id).replace(/\s+/g, '').toLowerCase().slice(0, 30);
+          // Ensure unique username
+          const baseUsername = username;
+          let finalUsername = baseUsername;
+          let suffix = 1;
+          while (db.prepare('SELECT id FROM users WHERE username = ?').get(finalUsername)) {
+            finalUsername = `${baseUsername}${suffix++}`;
+          }
+          db.prepare(
+            `INSERT INTO users (id, username, email, password_hash, google_id, avatar_url, created_at)
+             VALUES (?, ?, ?, '', ?, ?, ?)`
+          ).run(id, finalUsername, email, googleId, picture ?? null, Date.now());
+          user = db.prepare<string[], UserRow>('SELECT * FROM users WHERE id = ?').get(id)!;
+        }
+      }
+
+      const accessToken = authService.generateAccessToken(user.id);
+      const refreshToken = authService.generateRefreshToken(user.id);
+
+      res
+        .cookie('refresh_token', refreshToken, cookieOptions())
+        .json({
+          accessToken,
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            avatarUrl: user.avatar_url,
+            syncEnabled: user.sync_enabled === 1,
+          },
+        });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 // ─── POST /auth/register ──────────────────────────────────────────────────────
 router.post(

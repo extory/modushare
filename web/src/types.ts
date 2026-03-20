@@ -15,6 +15,7 @@ export interface User {
   username: string;
   email: string;
   syncEnabled: boolean;
+  avatarUrl?: string;
 }
 
 export interface LoginResponse {
