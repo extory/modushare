@@ -163,7 +163,8 @@
       const result = await ipcRenderer.invoke('auth:google');
 
       if (result.ok) {
-        window.close();
+        // main process가 loginWin.close()를 처리함 — renderer에서 별도 close 불필요
+        return;
       } else if (result.error && result.error !== '로그인이 취소됐습니다.') {
         showError(result.error || 'Google 로그인 실패');
         googleBtn.disabled = false;

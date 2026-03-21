@@ -96,12 +96,12 @@ export function setupIpcHandlers(
         let resolved = false;
 
         const cleanup = () => {
-          localServer.close();
-          if (!authWin.isDestroyed()) authWin.close();
+          try { localServer.close(); } catch {}
+          if (!authWin.isDestroyed()) authWin.destroy();
         };
 
         authWin.on('closed', () => {
-          localServer.close();
+          try { localServer.close(); } catch {}
           if (!resolved) {
             resolved = true;
             resolve({ ok: false, error: '로그인이 취소됐습니다.' });
@@ -132,13 +132,14 @@ export function setupIpcHandlers(
             );
             store.set('accessToken', data.accessToken);
             store.set('userEmail', data.user.email);
+            resolved = true;
+            cleanup();
+            // 로그인 창 닫기 (main process에서 처리)
+            const loginWin = getLoginWindow();
+            if (loginWin && !loginWin.isDestroyed()) loginWin.close();
             wsClient.connect();
             poller.start();
             wsClient.emit('statusChange');
-            const loginWin = getLoginWindow();
-            if (loginWin && !loginWin.isDestroyed()) loginWin.close();
-            resolved = true;
-            cleanup();
             resolve({ ok: true, user: data.user });
           } catch (err: unknown) {
             const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Google 로그인 실패';
