@@ -37,6 +37,7 @@ export function setupIpcHandlers(
         // Connect WS and start polling after successful login
         wsClient.connect();
         poller.start();
+        wsClient.emit('statusChange');
 
         // Close login window
         const loginWin = getLoginWindow();
@@ -133,6 +134,7 @@ export function setupIpcHandlers(
             store.set('userEmail', data.user.email);
             wsClient.connect();
             poller.start();
+            wsClient.emit('statusChange');
             const loginWin = getLoginWindow();
             if (loginWin && !loginWin.isDestroyed()) loginWin.close();
             resolved = true;
