@@ -1,7 +1,27 @@
-import { apiClient, setAccessToken } from './client';
+import axios from 'axios';
+import { apiClient, setAccessToken, BASE_URL } from './client';
 import { LoginResponse, HistoryResponse, SharePartner, ShareInvitation, AdminUser, AdminStats, AdminStorageUser } from '../types';
 
 export const endpoints = {
+  async refresh(): Promise<LoginResponse | null> {
+    try {
+      const { data: refreshData } = await axios.post<{ accessToken: string }>(
+        `${BASE_URL}/auth/refresh`,
+        {},
+        { withCredentials: true }
+      );
+      setAccessToken(refreshData.accessToken);
+      // fetch user info with new token
+      const { data: meData } = await axios.get<LoginResponse['user']>(
+        `${BASE_URL}/auth/me`,
+        { headers: { Authorization: `Bearer ${refreshData.accessToken}` }, withCredentials: true }
+      );
+      return { accessToken: refreshData.accessToken, user: meData };
+    } catch {
+      return null;
+    }
+  },
+
   async login(email: string, password: string): Promise<LoginResponse> {
     const { data } = await apiClient.post<LoginResponse>('/auth/login', {
       email,

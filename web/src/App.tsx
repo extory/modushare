@@ -50,8 +50,20 @@ export default function App() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasShownFirstCopyToast = useRef(false);
 
+  const [authLoading, setAuthLoading] = useState(true);
+
   const { items, addItem, setItems, syncEnabled, setSyncEnabled } =
     useClipboardStore();
+
+  // ─── Auto-restore session on mount ──────────────────────────────────────────
+  useEffect(() => {
+    endpoints.refresh().then((result) => {
+      if (result) {
+        setUser(result.user);
+        setToken(result.accessToken);
+      }
+    }).finally(() => setAuthLoading(false));
+  }, []);
 
   // ─── Version mismatch banner (최초 1회) ─────────────────────────────────────
   const showVersionMismatchToast = useCallback((peerVersion: string, downloadUrl: string) => {
@@ -203,6 +215,8 @@ export default function App() {
     sendMessage(msg);
     setSyncEnabled(msg.type === 'SYNC_ENABLE');
   };
+
+  if (authLoading) return null;
 
   if (!user || !token) {
     return <LoginForm onSuccess={handleLoginSuccess} />;
