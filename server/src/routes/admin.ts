@@ -1,5 +1,5 @@
-import { Router, Response } from 'express';
-import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
+import { Router, Request, Response } from 'express';
+import { requireAuth } from '../middleware/auth';
 import { requireAdmin } from '../middleware/adminAuth';
 import db from '../db';
 
@@ -10,7 +10,7 @@ router.use(requireAdmin as any);
 
 // ─── GET /admin/users ─────────────────────────────────────────────────────────
 // Member list: email, signup date, login method
-router.get('/users', (_req: AuthenticatedRequest, res: Response) => {
+router.get('/users', (_req: Request, res: Response) => {
   const users = db.prepare(`
     SELECT
       u.id,
@@ -30,7 +30,7 @@ router.get('/users', (_req: AuthenticatedRequest, res: Response) => {
 
 // ─── GET /admin/stats ─────────────────────────────────────────────────────────
 // Share counts: daily / weekly / monthly
-router.get('/stats', (_req: AuthenticatedRequest, res: Response) => {
+router.get('/stats', (_req: Request, res: Response) => {
   const now = Date.now();
   const oneDayAgo   = now - 86_400_000;
   const oneWeekAgo  = now - 7 * 86_400_000;
@@ -86,7 +86,7 @@ router.get('/stats', (_req: AuthenticatedRequest, res: Response) => {
 
 // ─── GET /admin/storage ───────────────────────────────────────────────────────
 // Per-user storage breakdown
-router.get('/storage', (_req: AuthenticatedRequest, res: Response) => {
+router.get('/storage', (_req: Request, res: Response) => {
   const rows = db.prepare(`
     SELECT
       u.id,
