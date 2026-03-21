@@ -108,7 +108,7 @@ class AuthManager {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(["email": email, "password": password])
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await AuthManager.cookieSession.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let errorBody = try? JSONDecoder().decode([String: String].self, from: data)
             throw NSError(domain: "AuthError", code: 401,
@@ -123,6 +123,15 @@ class AuthManager {
 
     // ── Token refresh ─────────────────────────────────────────────────────────
 
+    /// Shared URLSession that persists cookies (needed for refresh_token httpOnly cookie)
+    static let cookieSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.httpCookieStorage = HTTPCookieStorage.shared
+        config.httpShouldSetCookies = true
+        config.httpCookieAcceptPolicy = .always
+        return URLSession(configuration: config)
+    }()
+
     func refreshToken() async throws {
         guard let url = URL(string: "\(serverURL)/auth/refresh") else {
             throw URLError(.badURL)
@@ -130,7 +139,7 @@ class AuthManager {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await AuthManager.cookieSession.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             accessToken = nil
             throw NSError(domain: "AuthError", code: 401,
@@ -139,6 +148,25 @@ class AuthManager {
 
         let result = try JSONDecoder().decode(RefreshResponse.self, from: data)
         accessToken = result.accessToken
+    }
+
+    /// Make an authenticated request. If 401, attempts token refresh once then retries.
+    func authenticatedData(for request: URLRequest) async throws -> (Data, URLResponse) {
+        var req = request
+        if let token = accessToken {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, response) = try await AuthManager.cookieSession.data(for: req)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 401 else {
+            return (data, response)
+        }
+        // Try refresh once
+        try await refreshToken()
+        var retryReq = request
+        if let token = accessToken {
+            retryReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        return try await AuthManager.cookieSession.data(for: retryReq)
     }
 
     // ── Google Login ──────────────────────────────────────────────────────────
