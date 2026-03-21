@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import { clipboard, nativeImage, Notification } from 'electron';
 import crypto from 'crypto';
+import axios from 'axios';
 import Store from 'electron-store';
 import { AppStore } from './main';
 import { ClipboardChangedEvent } from './clipboardPoller';
@@ -252,10 +253,32 @@ export class WSClient extends EventEmitter {
   private scheduleReconnect(): void {
     if (this.reconnectTimer) return;
     console.log(`[ws] Reconnecting in ${this.backoff}ms…`);
-    this.reconnectTimer = setTimeout(() => {
+    this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null;
+      // Try to refresh token before reconnecting
+      await this.tryRefreshToken();
       this.connect();
     }, this.backoff);
     this.backoff = Math.min(this.backoff * 2, MAX_BACKOFF_MS);
+  }
+
+  private async tryRefreshToken(): Promise<void> {
+    const serverUrl = this.store.get('serverUrl');
+    const refreshToken = this.store.get('refreshToken');
+    if (!refreshToken) return;
+    try {
+      const { data } = await axios.post<{ accessToken: string; refreshToken: string }>(
+        `${serverUrl}/auth/refresh`,
+        {},
+        { headers: { Authorization: `Bearer ${refreshToken}` } }
+      );
+      if (data.accessToken) {
+        this.store.set('accessToken', data.accessToken);
+        this.store.set('refreshToken', data.refreshToken ?? refreshToken);
+        console.log('[ws] Token refreshed successfully');
+      }
+    } catch {
+      console.log('[ws] Token refresh failed, will retry with existing token');
+    }
   }
 }

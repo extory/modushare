@@ -135,6 +135,7 @@ router.post(
         .cookie('refresh_token', refreshToken, cookieOptions())
         .json({
           accessToken,
+          refreshToken,
           user: {
             id: user.id,
             username: user.username,
@@ -249,6 +250,7 @@ router.post(
         .cookie('refresh_token', refreshToken, cookieOptions())
         .json({
           accessToken,
+          refreshToken,
           user: {
             id: user.id,
             username: user.username,
@@ -268,7 +270,14 @@ router.post(
   '/refresh',
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rawToken = req.cookies?.['refresh_token'] as string | undefined;
+      // Accept refresh token from cookie (web) or Authorization header (Electron)
+      const cookieToken = req.cookies?.['refresh_token'] as string | undefined;
+      const authHeader = req.headers['authorization'];
+      const headerToken = authHeader?.startsWith('Bearer ')
+        ? authHeader.slice(7)
+        : undefined;
+      const rawToken = cookieToken ?? headerToken;
+
       if (!rawToken) {
         res.status(401).json({ error: 'No refresh token' });
         return;
@@ -284,7 +293,7 @@ router.post(
 
       res
         .cookie('refresh_token', result.newRefreshToken, cookieOptions())
-        .json({ accessToken });
+        .json({ accessToken, refreshToken: result.newRefreshToken });
     } catch (err) {
       next(err);
     }

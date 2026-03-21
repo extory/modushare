@@ -13,6 +13,7 @@ interface LoginPayload {
 
 interface LoginResponse {
   accessToken: string;
+  refreshToken: string;
   user: { id: string; username: string; email: string; syncEnabled: boolean };
 }
 
@@ -32,6 +33,7 @@ export function setupIpcHandlers(
           { email, password }
         );
         store.set('accessToken', data.accessToken);
+        store.set('refreshToken', data.refreshToken ?? '');
         store.set('userEmail', data.user.email);
 
         // Connect WS and start polling after successful login
@@ -131,6 +133,7 @@ export function setupIpcHandlers(
               { code, redirectUri }
             );
             store.set('accessToken', data.accessToken);
+            store.set('refreshToken', data.refreshToken ?? '');
             store.set('userEmail', data.user.email);
             resolved = true;
             cleanup();
