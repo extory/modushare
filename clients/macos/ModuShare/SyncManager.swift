@@ -5,6 +5,9 @@ import UserNotifications
 
 // 512 KB limit for inline image transfer
 private let maxInlineImageBytes = 512 * 1024
+private let clientVersion = "1.0.0"
+private let clientPlatform = "macos"
+private let downloadUrl = "https://github.com/extory/modushare/releases/latest"
 
 class SyncManager: NSObject {
 
@@ -20,6 +23,7 @@ class SyncManager: NSObject {
 
     private(set) var isConnected: Bool = false
     private var hasShownFirstCopyToast: Bool = false
+    private var hasShownVersionToast: Bool = false
     private var flashTimer: Timer?
     private var flashCount: Int = 0
 
@@ -221,6 +225,14 @@ extension SyncManager: WebSocketClientDelegate {
     func webSocketDidConnect(_ client: WebSocketClient) {
         isConnected = true
         NotificationCenter.default.post(name: .syncStatusChanged, object: nil)
+        // Announce version to server so it can detect mismatches with peer sessions
+        let hello = WSMessage(
+            type: "CLIENT_HELLO",
+            payload: WSPayload(clientVersion: clientVersion, platform: clientPlatform),
+            timestamp: Date().timeIntervalSince1970 * 1000,
+            deviceId: deviceId
+        )
+        client.send(message: hello)
     }
 
     func webSocketDidDisconnect(_ client: WebSocketClient, error: Error?) {
@@ -264,6 +276,16 @@ extension SyncManager: WebSocketClientDelegate {
             isSyncEnabled = false
             NotificationCenter.default.post(name: .syncStatusChanged, object: nil)
 
+        case "VERSION_MISMATCH":
+            if !hasShownVersionToast, let payload = message.payload {
+                hasShownVersionToast = true
+                let peerVer = payload.peerVersion ?? ""
+                let url = payload.downloadUrl ?? downloadUrl
+                DispatchQueue.main.async {
+                    self.showVersionMismatchNotification(peerVersion: peerVer, downloadUrl: url)
+                }
+            }
+
         default:
             break
         }
@@ -288,6 +310,46 @@ extension SyncManager: WebSocketClientDelegate {
                 NotificationCenter.default.post(name: .menuBarFlash, object: "📋")
             }
         }
+    }
+
+    // MARK: – Version mismatch notification
+
+    private func showVersionMismatchNotification(peerVersion: String, downloadUrl: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "ModuShare – 업데이트 권장"
+        content.body = "연결된 기기가 더 최신 버전(\(peerVersion))을 사용 중입니다. 최신 버전으로 업그레이드를 권장합니다."
+        content.sound = .default
+        content.userInfo = ["downloadUrl": downloadUrl]
+
+        let action = UNNotificationAction(
+            identifier: "DOWNLOAD",
+            title: "다운로드",
+            options: .foreground
+        )
+        let category = UNNotificationCategory(
+            identifier: "VERSION_MISMATCH",
+            actions: [action],
+            intentIdentifiers: [],
+            options: []
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([category])
+        content.categoryIdentifier = "VERSION_MISMATCH"
+
+        let request = UNNotificationRequest(
+            identifier: "modushare.versionmismatch",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            UNUserNotificationCenter.current().add(request)
+        }
+
+        // Also post to NotificationCenter so AppDelegate can open the URL
+        NotificationCenter.default.post(
+            name: .versionMismatch,
+            object: downloadUrl
+        )
     }
 
     // MARK: – Quota exceeded notification
@@ -338,4 +400,5 @@ extension SyncManager: WebSocketClientDelegate {
 extension Notification.Name {
     static let syncStatusChanged = Notification.Name("com.modushare.syncStatusChanged")
     static let menuBarFlash      = Notification.Name("com.modushare.menuBarFlash")
+    static let versionMismatch   = Notification.Name("com.modushare.versionMismatch")
 }

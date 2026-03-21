@@ -8,6 +8,9 @@ interface UserRow {
 // userId -> Set of open WebSocket connections for that user
 const sessions = new Map<string, Set<WebSocket>>();
 
+// ws -> { version, platform }
+const clientMeta = new Map<WebSocket, { version: string; platform: string }>();
+
 export const userSessions = {
   addSession(userId: string, ws: WebSocket): void {
     if (!sessions.has(userId)) {
@@ -20,9 +23,31 @@ export const userSessions = {
     const set = sessions.get(userId);
     if (!set) return;
     set.delete(ws);
+    clientMeta.delete(ws);
     if (set.size === 0) {
       sessions.delete(userId);
     }
+  },
+
+  setClientMeta(ws: WebSocket, version: string, platform: string): void {
+    clientMeta.set(ws, { version, platform });
+  },
+
+  getClientMeta(ws: WebSocket): { version: string; platform: string } | undefined {
+    return clientMeta.get(ws);
+  },
+
+  /** Return all sessions for a user except the given ws, along with their meta */
+  getPeerMetas(userId: string, excludeWs: WebSocket): Array<{ ws: WebSocket; version: string; platform: string }> {
+    const set = sessions.get(userId);
+    if (!set) return [];
+    const result: Array<{ ws: WebSocket; version: string; platform: string }> = [];
+    for (const peer of set) {
+      if (peer === excludeWs) continue;
+      const meta = clientMeta.get(peer);
+      if (meta) result.push({ ws: peer, ...meta });
+    }
+    return result;
   },
 
   broadcastToUser(

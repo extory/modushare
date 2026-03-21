@@ -5,6 +5,9 @@ import { ClipboardFeed } from './components/ClipboardFeed';
 import { SyncToggle } from './components/SyncToggle';
 import { ShareManager } from './components/ShareManager';
 import { DownloadButton } from './components/DownloadButton';
+import { AdminPanel } from './components/AdminPanel';
+import { TermsOfService } from './components/TermsOfService';
+import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useClipboardStore } from './store/clipboardStore';
 import { endpoints } from './api/endpoints';
@@ -20,17 +23,42 @@ const DEVICE_ID = (() => {
   return id;
 })();
 
+// ─── Simple hash-based routing for legal pages ───────────────────────────────
+function useHash() {
+  const [hash, setHash] = React.useState(window.location.hash);
+  React.useEffect(() => {
+    const handler = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', handler);
+    return () => window.removeEventListener('hashchange', handler);
+  }, []);
+  return hash;
+}
+
 export default function App() {
+  const hash = useHash();
+  if (hash === '#/terms') return <TermsOfService />;
+  if (hash === '#/privacy') return <PrivacyPolicy />;
+
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [pendingInvitations, setPendingInvitations] = useState<ShareInvitation[]>([]);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [versionBanner, setVersionBanner] = useState<{ peerVersion: string; downloadUrl: string } | null>(null);
+  const versionBannerShown = React.useRef(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasShownFirstCopyToast = useRef(false);
 
   const { items, addItem, setItems, syncEnabled, setSyncEnabled } =
     useClipboardStore();
+
+  // ─── Version mismatch banner (최초 1회) ─────────────────────────────────────
+  const showVersionMismatchToast = useCallback((peerVersion: string, downloadUrl: string) => {
+    if (versionBannerShown.current) return;
+    versionBannerShown.current = true;
+    setVersionBanner({ peerVersion, downloadUrl });
+  }, []);
 
   // ─── Toast helper ────────────────────────────────────────────────────────────
   const showToast = useCallback((message: string) => {
@@ -106,6 +134,12 @@ export default function App() {
           showToast(`✅ ${acc.byUsername}님이 공유 초대를 수락했습니다`);
           break;
         }
+        case 'VERSION_MISMATCH': {
+          const vm = msg.payload as { myVersion?: string; peerVersion?: string; downloadUrl?: string };
+          const url = vm.downloadUrl ?? 'https://github.com/extory/modushare/releases/latest';
+          showVersionMismatchToast(vm.peerVersion ?? '', url);
+          break;
+        }
         default:
           break;
       }
@@ -176,6 +210,24 @@ export default function App() {
 
   return (
     <div style={styles.shell}>
+      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
+
+      {/* ── Version mismatch banner ── */}
+      {versionBanner && (
+        <div style={styles.versionBanner}>
+          <span>🔔 연결된 기기가 더 최신 버전({versionBanner.peerVersion})을 사용 중입니다. 업그레이드를 권장합니다.</span>
+          <a
+            href={versionBanner.downloadUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={styles.versionBannerLink}
+          >
+            최신 버전 다운로드 →
+          </a>
+          <button style={styles.versionBannerClose} onClick={() => setVersionBanner(null)}>✕</button>
+        </div>
+      )}
+
       {/* ── Toast ── */}
       {toast && (
         <div style={styles.toast} role="status">
@@ -201,6 +253,11 @@ export default function App() {
             onInvitationHandled={(id) => setPendingInvitations((prev) => prev.filter((i) => i.id !== id))}
           />
           <DownloadButton />
+          {user.role === 'admin' && (
+            <button style={styles.adminBtn} onClick={() => setShowAdmin(true)}>
+              Admin
+            </button>
+          )}
           <span style={styles.username}>{user.username}</span>
           <button style={styles.logoutBtn} onClick={handleLogout}>
             Sign Out
@@ -218,6 +275,15 @@ export default function App() {
           <ClipboardFeed items={items} loading={historyLoading} />
         </div>
       </main>
+
+      {/* ── Footer ── */}
+      <footer style={styles.footer}>
+        <span>© 2026 Extory. All rights reserved.</span>
+        <span style={styles.footerSep}>·</span>
+        <a href="#/terms" style={styles.footerLink}>Terms of Service</a>
+        <span style={styles.footerSep}>·</span>
+        <a href="#/privacy" style={styles.footerLink}>Privacy Policy</a>
+      </footer>
     </div>
   );
 }
@@ -273,6 +339,16 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#555',
     fontWeight: 500,
   },
+  adminBtn: {
+    padding: '4px 12px',
+    borderRadius: 6,
+    border: '1px solid #6366f1',
+    background: '#6366f1',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: '0.8rem',
+    fontWeight: 600,
+  },
   logoutBtn: {
     padding: '4px 12px',
     borderRadius: 6,
@@ -291,4 +367,44 @@ const styles: Record<string, React.CSSProperties> = {
   },
   feedTitle: { fontSize: '1.125rem', fontWeight: 600 },
   count: { fontSize: '0.8125rem', color: '#aaa' },
+  footer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.5rem',
+    padding: '1rem',
+    fontSize: '0.75rem',
+    color: '#aaa',
+    borderTop: '1px solid #e5e7eb',
+    background: '#fff',
+  },
+  footerSep: { color: '#ddd' },
+  footerLink: { color: '#aaa', textDecoration: 'none' },
+  versionBanner: {
+    background: '#fffbeb',
+    borderBottom: '1px solid #fcd34d',
+    padding: '0.6rem 1.25rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    fontSize: '0.875rem',
+    color: '#92400e',
+    flexWrap: 'wrap' as const,
+  },
+  versionBannerLink: {
+    color: '#6366f1',
+    fontWeight: 600,
+    textDecoration: 'none',
+    marginLeft: 'auto',
+    whiteSpace: 'nowrap' as const,
+  },
+  versionBannerClose: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#92400e',
+    fontSize: '1rem',
+    padding: '0 4px',
+    lineHeight: 1,
+  },
 };

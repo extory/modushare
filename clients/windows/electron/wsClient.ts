@@ -9,6 +9,9 @@ import { ClipboardChangedEvent } from './clipboardPoller';
 const MAX_INLINE_BYTES = 512 * 1024; // 512 KB
 const INITIAL_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
+const CLIENT_VERSION = '1.2.0';
+const CLIENT_PLATFORM = 'windows';
+const DOWNLOAD_URL = 'https://github.com/extory/modushare/releases/latest';
 
 interface WSEnvelope {
   type: string;
@@ -24,6 +27,7 @@ export class WSClient extends EventEmitter {
   private connected = false;
   private poller: import('./clipboardPoller').ClipboardPoller | null = null;
   private hasShownFirstCopyToast = false;
+  private hasShownVersionToast = false;
 
   constructor(private readonly store: Store<AppStore>) {
     super();
@@ -48,6 +52,13 @@ export class WSClient extends EventEmitter {
         this.connected = true;
         this.backoff = INITIAL_BACKOFF_MS;
         this.emit('statusChange');
+        // Announce version so server can detect mismatches
+        this.sendRaw({
+          type: 'CLIENT_HELLO',
+          payload: { clientVersion: CLIENT_VERSION, platform: CLIENT_PLATFORM } as Record<string, unknown>,
+          timestamp: Date.now(),
+          deviceId: this.store.get('deviceId'),
+        });
       });
 
       this.ws.on('message', (data: WebSocket.Data) => {
@@ -214,6 +225,22 @@ export class WSClient extends EventEmitter {
           title: 'ModuShare',
           body: `${acc.byUsername ?? '상대방'}님이 공유 초대를 수락했습니다`,
         }).show();
+        break;
+      }
+
+      case 'VERSION_MISMATCH': {
+        if (this.hasShownVersionToast) break;
+        this.hasShownVersionToast = true;
+        const vm = msg.payload as { myVersion?: string; peerVersion?: string; downloadUrl?: string };
+        const url = vm.downloadUrl ?? DOWNLOAD_URL;
+        new Notification({
+          title: 'ModuShare – 업데이트 권장',
+          body: `연결된 기기가 더 최신 버전(${vm.peerVersion ?? ''})을 사용 중입니다. 최신 버전으로 업그레이드를 권장합니다.`,
+          actions: [{ type: 'button', text: '다운로드' }],
+          closeButtonText: '나중에',
+        }).show();
+        // Also emit so tray can open the URL if needed
+        this.emit('versionMismatch', url);
         break;
       }
 

@@ -59,6 +59,17 @@ export function createTray(
     });
   });
 
+  wsClient.on('versionMismatch', (downloadUrl: string) => {
+    tray.displayBalloon({
+      title: 'ModuShare – 업데이트 권장',
+      content: '연결된 기기가 더 최신 버전을 사용 중입니다. 클릭하여 최신 버전을 다운로드하세요.',
+      iconType: 'info',
+    });
+    tray.once('balloon-click', () => {
+      shell.openExternal(downloadUrl);
+    });
+  });
+
   const updateMenu = () => {
     const syncEnabled = store.get('syncEnabled');
     const isConnected = wsClient.isConnected();

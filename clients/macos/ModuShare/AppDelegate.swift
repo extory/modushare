@@ -1,4 +1,5 @@
 import Cocoa
+import UserNotifications
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -28,6 +29,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: .menuBarFlash,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(versionMismatchDidOccur(_:)),
+            name: .versionMismatch,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(updateAvailableDidOccur(_:)),
+            name: .updateAvailable,
+            object: nil
+        )
+
+        // Start periodic update checks
+        AutoUpdater.shared.startPeriodicChecks()
 
         // If not authenticated, show login window
         if !AuthManager.shared.isAuthenticated {
@@ -100,6 +116,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         menu.addItem(.separator())
+
+        // Auto Update toggle
+        let autoUpdateItem = NSMenuItem(
+            title: AutoUpdater.shared.isAutoUpdateEnabled ? "자동 업데이트: 켜짐" : "자동 업데이트: 꺼짐",
+            action: #selector(toggleAutoUpdate),
+            keyEquivalent: ""
+        )
+        menu.addItem(autoUpdateItem)
+
+        menu.addItem(withTitle: "지금 업데이트 확인", action: #selector(checkForUpdateNow), keyEquivalent: "")
+
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Quit ModuShare", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         for item in menu.items {
@@ -119,6 +147,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let icon = notification.object as? String,
            let button = statusItem.button {
             button.title = icon
+        }
+    }
+
+    @objc private func versionMismatchDidOccur(_ notification: Notification) {
+        // VERSION_MISMATCH: already handled by AutoUpdater periodic check.
+        // If autoUpdate is off, open browser; if on, AutoUpdater will handle it.
+        if !AutoUpdater.shared.isAutoUpdateEnabled,
+           let urlString = notification.object as? String,
+           let url = URL(string: urlString) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    @objc private func updateAvailableDidOccur(_ notification: Notification) {
+        if let urlString = notification.object as? String,
+           let url = URL(string: urlString) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    @objc private func toggleAutoUpdate() {
+        AutoUpdater.shared.isAutoUpdateEnabled.toggle()
+        updateMenu()
+    }
+
+    @objc private func checkForUpdateNow() {
+        Task {
+            let result = await AutoUpdater.shared.checkForUpdate()
+            if result == nil {
+                // No update available — show a brief notification
+                let content = UNMutableNotificationContent()
+                content.title = "ModuShare"
+                content.body = "현재 최신 버전(v\(AutoUpdater.shared.currentVersion))입니다."
+                content.sound = .default
+                let req = UNNotificationRequest(identifier: "modushare.update.uptodate", content: content, trigger: nil)
+                UNUserNotificationCenter.current().add(req)
+            }
         }
     }
 

@@ -1,9 +1,22 @@
 import { IncomingMessage, Server } from 'http';
 import WebSocket, { WebSocketServer } from 'ws';
-import { WSMessage, ClipboardUpdatePayload } from '@modushare/shared';
+import { WSMessage, ClipboardUpdatePayload, ClientHelloPayload, VersionMismatchPayload } from '@modushare/shared';
 import { authService } from '../services/authService';
 import { userSessions } from './userSessions';
 import { handleClipboardUpdate, handleSyncToggle } from './handlers';
+
+const DOWNLOAD_URL = 'https://github.com/extory/modushare/releases/latest';
+
+/** Compare two semver strings. Returns positive if a > b, negative if a < b, 0 if equal. */
+function compareSemver(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
 
 const PING_INTERVAL_MS = 30_000;
 
@@ -98,6 +111,46 @@ export function attachWebSocketServer(httpServer: Server): WebSocketServer {
           case 'SYNC_DISABLE':
             handleSyncToggle(userId, false);
             break;
+
+          case 'CLIENT_HELLO': {
+            const hello = msg.payload as ClientHelloPayload;
+            const myVersion = hello?.clientVersion ?? '0.0.0';
+            const myPlatform = hello?.platform ?? 'unknown';
+
+            // Register this client's version
+            userSessions.setClientMeta(ws, myVersion, myPlatform);
+
+            // Compare against all other connected sessions of this user
+            const peers = userSessions.getPeerMetas(userId, ws);
+            for (const peer of peers) {
+              const cmp = compareSemver(peer.version, myVersion);
+
+              if (cmp > 0) {
+                // Peer is newer — notify THIS client to upgrade
+                const mismatch: WSMessage<VersionMismatchPayload> = {
+                  type: 'VERSION_MISMATCH',
+                  payload: { myVersion, peerVersion: peer.version, downloadUrl: DOWNLOAD_URL },
+                  timestamp: Date.now(),
+                  deviceId: 'server',
+                };
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify(mismatch));
+                }
+              } else if (cmp < 0) {
+                // This client is newer — notify the PEER to upgrade
+                const mismatch: WSMessage<VersionMismatchPayload> = {
+                  type: 'VERSION_MISMATCH',
+                  payload: { myVersion: peer.version, peerVersion: myVersion, downloadUrl: DOWNLOAD_URL },
+                  timestamp: Date.now(),
+                  deviceId: 'server',
+                };
+                if (peer.ws.readyState === WebSocket.OPEN) {
+                  peer.ws.send(JSON.stringify(mismatch));
+                }
+              }
+            }
+            break;
+          }
 
           default:
             console.warn(`[ws] Unknown message type: ${msg.type}`);

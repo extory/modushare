@@ -110,6 +110,13 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             <div style={styles.googleWrap}>
               <div ref={googleBtnRef} />
             </div>
+            <p style={{ ...styles.agreement, marginTop: '-0.75rem', marginBottom: '0.5rem' }}>
+              Google로 계속하면{' '}
+              <a href="#/terms" target="_blank" style={styles.agreementLink}>이용약관</a>
+              {' '}및{' '}
+              <a href="#/privacy" target="_blank" style={styles.agreementLink}>개인정보 처리방침</a>
+              에 동의합니다.
+            </p>
             <div style={styles.divider}>
               <span style={styles.dividerLine} />
               <span style={styles.dividerText}>또는</span>
@@ -174,6 +181,16 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           </div>
 
           {error && <p style={styles.error}>{error}</p>}
+
+          {mode === 'register' && (
+            <p style={styles.agreement}>
+              계정을 만들면{' '}
+              <a href="#/terms" target="_blank" style={styles.agreementLink}>서비스 이용약관</a>
+              {' '}및{' '}
+              <a href="#/privacy" target="_blank" style={styles.agreementLink}>개인정보 처리방침</a>
+              에 동의하는 것으로 간주됩니다.
+            </p>
+          )}
 
           <button style={styles.button} type="submit" disabled={loading}>
             {loading ? '처리 중…' : mode === 'login' ? '로그인' : '계정 만들기'}
@@ -284,5 +301,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'background 0.2s',
+  },
+  agreement: {
+    fontSize: '0.78rem',
+    color: '#888',
+    lineHeight: 1.6,
+    textAlign: 'center',
+  },
+  agreementLink: {
+    color: '#6366f1',
+    textDecoration: 'underline',
   },
 };

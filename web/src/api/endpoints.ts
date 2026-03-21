@@ -1,5 +1,5 @@
 import { apiClient, setAccessToken } from './client';
-import { LoginResponse, HistoryResponse, SharePartner, ShareInvitation } from '../types';
+import { LoginResponse, HistoryResponse, SharePartner, ShareInvitation, AdminUser, AdminStats, AdminStorageUser } from '../types';
 
 export const endpoints = {
   async login(email: string, password: string): Promise<LoginResponse> {
@@ -75,6 +75,21 @@ export const endpoints = {
 
   async rejectInvitation(id: string): Promise<void> {
     await apiClient.post(`/share/invitations/${id}/reject`);
+  },
+
+  async adminGetUsers(): Promise<{ users: AdminUser[] }> {
+    const { data } = await apiClient.get('/admin/users');
+    return data;
+  },
+
+  async adminGetStats(): Promise<AdminStats> {
+    const { data } = await apiClient.get('/admin/stats');
+    return data;
+  },
+
+  async adminGetStorage(): Promise<{ users: AdminStorageUser[] }> {
+    const { data } = await apiClient.get('/admin/storage');
+    return data;
   },
 
   async uploadImage(blob: Blob): Promise<{ imageUrl: string }> {

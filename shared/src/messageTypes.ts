@@ -27,6 +27,19 @@ export interface AckPayload {
   itemId: string;
 }
 
+export interface ClientHelloPayload {
+  /** Semantic version string, e.g. "1.2.0" */
+  clientVersion: string;
+  /** 'windows' | 'macos' | 'web' */
+  platform: string;
+}
+
+export interface VersionMismatchPayload {
+  myVersion: string;
+  peerVersion: string;
+  downloadUrl: string;
+}
+
 // ─── Message type discriminator ──────────────────────────────────────────────
 
 export type WSMessageType =
@@ -38,7 +51,9 @@ export type WSMessageType =
   | 'ERROR'
   | 'CLIPBOARD_ACK'
   | 'SHARE_INVITATION'
-  | 'SHARE_ACCEPTED';
+  | 'SHARE_ACCEPTED'
+  | 'CLIENT_HELLO'
+  | 'VERSION_MISMATCH';
 
 // ─── Generic envelope ────────────────────────────────────────────────────────
 

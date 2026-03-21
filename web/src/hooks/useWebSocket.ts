@@ -11,6 +11,7 @@ interface UseWebSocketOptions {
 
 const WS_BASE = import.meta.env['VITE_WS_URL'] ?? `ws://${location.host}`;
 const MAX_BACKOFF_MS = 30_000;
+const CLIENT_VERSION = import.meta.env['VITE_APP_VERSION'] as string ?? '0.0.0';
 
 export function useWebSocket({
   token,
@@ -34,6 +35,14 @@ export function useWebSocket({
     ws.addEventListener('open', () => {
       setIsConnected(true);
       backoffRef.current = 1_000; // reset backoff on success
+      // Announce version so server can detect mismatches
+      const hello: WSMessage = {
+        type: 'CLIENT_HELLO',
+        payload: { clientVersion: CLIENT_VERSION, platform: 'web' } as unknown as undefined,
+        timestamp: Date.now(),
+        deviceId,
+      };
+      ws.send(JSON.stringify(hello));
     });
 
     ws.addEventListener('message', (event: MessageEvent<string>) => {

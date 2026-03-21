@@ -9,3 +9,4 @@ uploads/
 data/
 .DS_Store
 *.log
+clients/windows/release/

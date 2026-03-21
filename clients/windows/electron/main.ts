@@ -4,6 +4,7 @@ import { createTray } from './tray';
 import { ClipboardPoller } from './clipboardPoller';
 import { WSClient } from './wsClient';
 import { setupIpcHandlers } from './ipcHandlers';
+import { setupAutoUpdater } from './updater';
 import Store from 'electron-store';
 
 export interface AppStore {
@@ -13,6 +14,7 @@ export interface AppStore {
   syncEnabled: boolean;
   deviceId: string;
   userEmail: string;
+  autoUpdate: boolean;
 }
 
 // ─── Electron store ───────────────────────────────────────────────────────────
@@ -24,6 +26,7 @@ export const store = new Store<AppStore>({
     syncEnabled: true,
     deviceId: require('uuid').v4(),
     userEmail: '',
+    autoUpdate: true,
   },
 });
 
@@ -54,6 +57,7 @@ app.whenReady().then(() => {
 
   setupIpcHandlers(wsClient, poller, store);
   createTray(store, wsClient, poller);
+  setupAutoUpdater(store);
 
   // If not authenticated, open login window
   if (!store.get('accessToken')) {

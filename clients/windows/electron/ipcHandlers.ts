@@ -153,12 +153,13 @@ export function setupIpcHandlers(
   ipcMain.handle('settings:get', () => ({
     serverUrl: store.get('serverUrl'),
     syncEnabled: store.get('syncEnabled'),
+    autoUpdate: store.get('autoUpdate'),
   }));
 
   // ── Save settings ──────────────────────────────────────────────────────────
   ipcMain.handle(
     'settings:set',
-    (_event, settings: { serverUrl?: string; syncEnabled?: boolean }) => {
+    (_event, settings: { serverUrl?: string; syncEnabled?: boolean; autoUpdate?: boolean }) => {
       if (settings.serverUrl !== undefined) {
         store.set('serverUrl', settings.serverUrl);
         // Reconnect with new URL
@@ -175,9 +176,39 @@ export function setupIpcHandlers(
           poller.stop();
         }
       }
+      if (settings.autoUpdate !== undefined) {
+        store.set('autoUpdate', settings.autoUpdate);
+      }
       return { ok: true };
     }
   );
+
+  // ── Check for updates manually ─────────────────────────────────────────────
+  ipcMain.handle('updater:check', async () => {
+    try {
+      const { autoUpdater } = require('electron-updater');
+      const result = await autoUpdater.checkForUpdates();
+      return { ok: true, updateInfo: result?.updateInfo ?? null };
+    } catch (err: unknown) {
+      return { ok: false, error: (err as Error).message };
+    }
+  });
+
+  // ── Install downloaded update now ──────────────────────────────────────────
+  ipcMain.handle('updater:install', () => {
+    try {
+      const { autoUpdater } = require('electron-updater');
+      autoUpdater.quitAndInstall(false, true);
+    } catch {
+      // ignore
+    }
+  });
+
+  // ── App version ────────────────────────────────────────────────────────────
+  ipcMain.handle('app:version', () => {
+    const { app } = require('electron');
+    return app.getVersion();
+  });
 
   // ── Share: list ────────────────────────────────────────────────────────────
   ipcMain.handle('share:list', async () => {

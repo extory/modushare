@@ -115,6 +115,25 @@
   </div>
 
   <div class="section">
+    <div class="section-title">Updates</div>
+    <div class="row">
+      <div>
+        <span class="row-label">자동 업데이트</span>
+        <p style="font-size:0.75rem;color:#888;margin-top:2px;">새 버전이 출시되면 자동으로 다운로드하고 설치합니다</p>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="autoUpdate" />
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="row" style="margin-top:0.75rem;">
+      <span class="row-label" id="currentVersionLabel" style="font-size:0.8rem;color:#888;"></span>
+      <button class="small" id="checkUpdateBtn">지금 확인</button>
+    </div>
+    <p class="status" id="updateStatus" style="display:none;margin-top:0.5rem;"></p>
+  </div>
+
+  <div class="section">
     <div class="section-title">공유 대상</div>
     <div class="add-row">
       <input type="email" id="shareEmail" placeholder="공유할 이메일 입력" />
@@ -139,6 +158,10 @@
       const s = await ipcRenderer.invoke('settings:get');
       document.getElementById('serverUrl').value = s.serverUrl || '';
       document.getElementById('syncEnabled').checked = s.syncEnabled;
+      document.getElementById('autoUpdate').checked = s.autoUpdate !== false;
+      // Show current version
+      const version = await ipcRenderer.invoke('app:version');
+      if (version) document.getElementById('currentVersionLabel').textContent = `현재 버전: v${version}`;
     }
 
     async function loadPartners() {
@@ -220,10 +243,40 @@
     document.getElementById('saveBtn').addEventListener('click', async () => {
       const serverUrl = document.getElementById('serverUrl').value.trim();
       const syncEnabled = document.getElementById('syncEnabled').checked;
-      await ipcRenderer.invoke('settings:set', { serverUrl, syncEnabled });
+      const autoUpdate = document.getElementById('autoUpdate').checked;
+      await ipcRenderer.invoke('settings:set', { serverUrl, syncEnabled, autoUpdate });
       const status = document.getElementById('status');
       status.style.display = 'block';
       setTimeout(() => { status.style.display = 'none'; }, 2000);
+    });
+
+    document.getElementById('checkUpdateBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('checkUpdateBtn');
+      const statusEl = document.getElementById('updateStatus');
+      btn.disabled = true;
+      btn.textContent = '확인 중…';
+      statusEl.style.display = 'none';
+      statusEl.style.color = '#555';
+
+      const result = await ipcRenderer.invoke('updater:check');
+      btn.disabled = false;
+      btn.textContent = '지금 확인';
+
+      if (!result.ok) {
+        statusEl.textContent = '개발 환경에서는 업데이트 확인이 지원되지 않습니다.';
+        statusEl.style.color = '#888';
+        statusEl.style.display = 'block';
+        return;
+      }
+      if (result.updateInfo) {
+        statusEl.textContent = `v${result.updateInfo.version} 업데이트가 있습니다. 자동 업데이트가 켜져 있으면 자동으로 설치됩니다.`;
+        statusEl.style.color = '#6366f1';
+      } else {
+        statusEl.textContent = '현재 최신 버전입니다.';
+        statusEl.style.color = '#22c55e';
+      }
+      statusEl.style.display = 'block';
+      setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
     });
 
     document.getElementById('logoutBtn').addEventListener('click', async () => {

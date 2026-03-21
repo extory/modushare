@@ -16,6 +16,7 @@ export interface User {
   email: string;
   syncEnabled: boolean;
   avatarUrl?: string;
+  role?: string;
 }
 
 export interface LoginResponse {
@@ -42,4 +43,29 @@ export interface ShareInvitation {
   fromUsername: string;
   fromEmail: string;
   createdAt: number;
+}
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  email: string;
+  created_at: number;
+  login_method: string;
+  item_count: number;
+  text_bytes: number;
+}
+
+export interface AdminStats {
+  shares: { daily: number; weekly: number; monthly: number; total: number };
+  clipboard: { daily: number; weekly: number; monthly: number; total: number };
+  storage: { total_bytes: number };
+  users: { total: number; google: number; email: number };
+}
+
+export interface AdminStorageUser {
+  id: string;
+  email: string;
+  username: string;
+  text_bytes: number;
+  item_count: number;
 }

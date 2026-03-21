@@ -15,6 +15,8 @@ interface UserRow {
   created_at: number;
   google_id: string | null;
   avatar_url: string | null;
+  role: string;
+  login_method: string;
 }
 
 const googleClient = new OAuth2Client(config.GOOGLE_CLIENT_ID);
@@ -85,6 +87,8 @@ router.post(
         .prepare<string[], UserRow>('SELECT * FROM users WHERE google_id = ?')
         .get(googleId);
 
+      const isExtoryAdmin = email.endsWith('@extory.co');
+
       if (!user) {
         // Try matching by email (existing account → link Google)
         user = db
@@ -93,8 +97,8 @@ router.post(
 
         if (user) {
           // Link Google to existing account
-          db.prepare('UPDATE users SET google_id = ?, avatar_url = ? WHERE id = ?').run(
-            googleId, picture ?? null, user.id
+          db.prepare('UPDATE users SET google_id = ?, avatar_url = ?, login_method = ? WHERE id = ?').run(
+            googleId, picture ?? null, 'google', user.id
           );
           user = db.prepare<string[], UserRow>('SELECT * FROM users WHERE id = ?').get(user.id)!;
         } else {
@@ -109,11 +113,19 @@ router.post(
             finalUsername = `${baseUsername}${suffix++}`;
           }
           db.prepare(
-            `INSERT INTO users (id, username, email, password_hash, google_id, avatar_url, created_at)
-             VALUES (?, ?, ?, '', ?, ?, ?)`
+            `INSERT INTO users (id, username, email, password_hash, google_id, avatar_url, created_at, login_method)
+             VALUES (?, ?, ?, '', ?, ?, ?, 'google')`
           ).run(id, finalUsername, email, googleId, picture ?? null, Date.now());
           user = db.prepare<string[], UserRow>('SELECT * FROM users WHERE id = ?').get(id)!;
         }
+      } else {
+        // Existing user found by google_id — update login_method
+        db.prepare('UPDATE users SET login_method = ? WHERE id = ?').run('google', user.id);
+      }
+
+      // Auto-grant admin for @extory.co Google users
+      if (isExtoryAdmin) {
+        db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(user.id);
       }
 
       const accessToken = authService.generateAccessToken(user.id);
@@ -129,6 +141,7 @@ router.post(
             email: user.email,
             avatarUrl: user.avatar_url,
             syncEnabled: user.sync_enabled === 1,
+            role: user.role ?? 'user',
           },
         });
     } catch (err) {
@@ -241,6 +254,7 @@ router.post(
             username: user.username,
             email: user.email,
             syncEnabled: user.sync_enabled === 1,
+            role: user.role ?? 'user',
           },
         });
     } catch (err) {
@@ -309,6 +323,7 @@ router.get('/me', requireAuth, (req: Request, res: Response) => {
     username: user.username,
     email: user.email,
     syncEnabled: user.sync_enabled === 1,
+    role: user.role ?? 'user',
   });
 });
 

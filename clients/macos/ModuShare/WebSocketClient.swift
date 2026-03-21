@@ -19,6 +19,13 @@ struct WSPayload: Codable {
     var enabled: Bool?
     var code: String?
     var message: String?
+    // CLIENT_HELLO
+    var clientVersion: String?
+    var platform: String?
+    // VERSION_MISMATCH
+    var myVersion: String?
+    var peerVersion: String?
+    var downloadUrl: String?
 }
 
 // MARK: – Delegate
