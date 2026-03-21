@@ -15,7 +15,10 @@ export async function handleClipboardUpdate(
   payload: ClipboardUpdatePayload,
   senderWs: WebSocket
 ): Promise<void> {
+  console.log(`[clipboard] UPDATE from userId=${userId} type=${payload.contentType}`);
+
   if (!userSessions.getSyncEnabled(userId)) {
+    console.log(`[clipboard] sync disabled for userId=${userId}`);
     sendError(senderWs, 'SYNC_DISABLED', 'Sync is currently disabled');
     return;
   }
@@ -117,7 +120,10 @@ export async function handleClipboardUpdate(
     ...inboundRows.map(r => r.user_id),
   ]);
 
+  console.log(`[clipboard] partnerIds to broadcast: [${[...partnerIds].join(', ')}]`);
   for (const partnerId of partnerIds) {
+    const count = userSessions.getSessionCount(partnerId);
+    console.log(`[clipboard] broadcasting to partnerId=${partnerId} sessions=${count}`);
     userSessions.broadcastToUser(partnerId, message);
   }
 
