@@ -140,15 +140,23 @@ router.post('/invitations/:id/accept', requireAuth, (req: Request, res: Response
 
     if (!inv) { res.status(404).json({ error: '초대를 찾을 수 없습니다' }); return; }
 
-    // 초대 수락: share_pairs에 양방향 추가 (초대자→수락자)
-    const existing = db.prepare(
+    // 초대 수락: share_pairs에 양방향 추가
+    const existingFwd = db.prepare(
       'SELECT id FROM share_pairs WHERE user_id = ? AND target_id = ?'
     ).get(inv.from_id, userId);
-
-    if (!existing) {
+    if (!existingFwd) {
       db.prepare(
         'INSERT INTO share_pairs (id, user_id, target_id, created_at) VALUES (?, ?, ?, ?)'
       ).run(uuidv4(), inv.from_id, userId, Date.now());
+    }
+
+    const existingRev = db.prepare(
+      'SELECT id FROM share_pairs WHERE user_id = ? AND target_id = ?'
+    ).get(userId, inv.from_id);
+    if (!existingRev) {
+      db.prepare(
+        'INSERT INTO share_pairs (id, user_id, target_id, created_at) VALUES (?, ?, ?, ?)'
+      ).run(uuidv4(), userId, inv.from_id, Date.now());
     }
 
     db.prepare(

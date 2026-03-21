@@ -98,19 +98,32 @@ export async function handleClipboardUpdate(
 
   userSessions.broadcastToUser(userId, message, senderWs);
 
-  // Broadcast to share partners (users who have added this user as a target)
-  const partnerRows = db
+  // Broadcast to share partners:
+  // 1. Users this sender has added as targets (user_id=userId → target_id)
+  // 2. Users who have added this sender as their target (target_id=userId → user_id)
+  const outboundRows = db
+    .prepare<string[], { target_id: string }>(
+      'SELECT target_id FROM share_pairs WHERE user_id = ?'
+    )
+    .all(userId);
+  const inboundRows = db
     .prepare<string[], { user_id: string }>(
       'SELECT user_id FROM share_pairs WHERE target_id = ?'
     )
     .all(userId);
-  for (const { user_id } of partnerRows) {
-    userSessions.broadcastToUser(user_id, message);
+
+  const partnerIds = new Set([
+    ...outboundRows.map(r => r.target_id),
+    ...inboundRows.map(r => r.user_id),
+  ]);
+
+  for (const partnerId of partnerIds) {
+    userSessions.broadcastToUser(partnerId, message);
   }
 
   // Send ack to sender (include how many other devices received the update)
-  const partnerSessionCount = partnerRows.reduce(
-    (sum, { user_id }) => sum + userSessions.getSessionCount(user_id),
+  const partnerSessionCount = [...partnerIds].reduce(
+    (sum, pid) => sum + userSessions.getSessionCount(pid),
     0
   );
   const sharedWithCount = userSessions.getSessionCount(userId) - 1 + partnerSessionCount; // exclude sender
