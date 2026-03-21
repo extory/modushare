@@ -30,6 +30,11 @@ export const store = new Store<AppStore>({
   },
 });
 
+// 프로덕션 빌드에서 serverUrl이 localhost로 남아있으면 강제 교체
+if (app.isPackaged && store.get('serverUrl').includes('localhost')) {
+  store.set('serverUrl', 'https://modushare.extory.co');
+}
+
 let mainWindow: BrowserWindow | null = null;
 let loginWindow: BrowserWindow | null = null;
 
