@@ -18,6 +18,7 @@ interface InvitationRow {
   created_at: number; updated_at: number;
   from_username: string; from_email: string;
   to_username: string; to_email: string;
+  [key: string]: string | number;
 }
 
 // ─── GET /share – list my share partners ─────────────────────────────────────
@@ -65,6 +66,62 @@ router.get('/invitations', requireAuth, (req: Request, res: Response) => {
       id: r.id, fromId: r.from_id,
       fromUsername: r.from_username, fromEmail: r.from_email,
       createdAt: r.created_at,
+    })),
+  });
+});
+
+// ─── GET /share/invitations/sent – list invitations I sent ───────────────────
+router.get('/invitations/sent', requireAuth, (req: Request, res: Response) => {
+  const { userId } = (req as AuthenticatedRequest).user;
+  const rows = db.prepare<string[], InvitationRow>(
+    `SELECT si.id, si.from_id, si.to_id, si.status, si.created_at, si.updated_at,
+            u.username AS to_username, u.email AS to_email
+     FROM share_invitations si
+     JOIN users u ON u.id = si.to_id
+     WHERE si.from_id = ?
+     ORDER BY si.created_at DESC`
+  ).all(userId);
+  res.json({
+    sent: rows.map((r) => ({
+      id: r.id, toId: r.to_id,
+      toUsername: r.to_username, toEmail: r.to_email,
+      status: r.status, createdAt: r.created_at,
+    })),
+  });
+});
+
+// ─── GET /share/history – full invitation history (sent + received) ───────────
+router.get('/history', requireAuth, (req: Request, res: Response) => {
+  const { userId } = (req as AuthenticatedRequest).user;
+
+  const received = db.prepare<string[], InvitationRow>(
+    `SELECT si.id, si.from_id, si.to_id, si.status, si.created_at, si.updated_at,
+            u.username AS from_username, u.email AS from_email
+     FROM share_invitations si
+     JOIN users u ON u.id = si.from_id
+     WHERE si.to_id = ?
+     ORDER BY si.created_at DESC`
+  ).all(userId);
+
+  const sent = db.prepare<string[], InvitationRow>(
+    `SELECT si.id, si.from_id, si.to_id, si.status, si.created_at, si.updated_at,
+            u.username AS to_username, u.email AS to_email
+     FROM share_invitations si
+     JOIN users u ON u.id = si.to_id
+     WHERE si.from_id = ?
+     ORDER BY si.created_at DESC`
+  ).all(userId);
+
+  res.json({
+    received: received.map((r) => ({
+      id: r.id, fromId: r.from_id,
+      fromUsername: r.from_username, fromEmail: r.from_email,
+      status: r.status, createdAt: r.created_at,
+    })),
+    sent: sent.map((r) => ({
+      id: r.id, toId: r.to_id,
+      toUsername: r.to_username, toEmail: r.to_email,
+      status: r.status, createdAt: r.created_at,
     })),
   });
 });

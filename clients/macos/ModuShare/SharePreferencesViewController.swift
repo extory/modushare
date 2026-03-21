@@ -58,6 +58,31 @@ actor ShareAPI {
         }
     }
 
+    struct HistoryItem: Decodable {
+        let id: String
+        let status: String
+        // received
+        let fromUsername: String?
+        let fromEmail: String?
+        // sent
+        let toUsername: String?
+        let toEmail: String?
+        let createdAt: Int64
+    }
+
+    struct HistoryResp: Decodable {
+        let received: [HistoryItem]
+        let sent: [HistoryItem]
+    }
+
+    static func fetchHistory() async throws -> HistoryResp {
+        guard let url = URL(string: "\(await AuthManager.shared.serverURL)/share/history") else {
+            throw URLError(.badURL)
+        }
+        let (data, _) = try await AuthManager.shared.authenticatedData(for: URLRequest(url: url))
+        return try JSONDecoder().decode(HistoryResp.self, from: data)
+    }
+
     static func acceptInvitation(id: String) async throws {
         guard let url = URL(string: "\(await AuthManager.shared.serverURL)/share/invitations/\(id)/accept") else {
             throw URLError(.badURL)
@@ -104,18 +129,26 @@ class SharePreferencesViewController: NSViewController {
 
     private var partners: [SharePartner] = []
     private var invitations: [Invitation] = []
+    private var sentHistory: [ShareAPI.HistoryItem] = []
+    private var receivedHistory: [ShareAPI.HistoryItem] = []
 
-    private let scrollView  = NSScrollView()
-    private let tableView   = NSTableView()
+    private let scrollView    = NSScrollView()
+    private let tableView     = NSTableView()
     private let invScrollView = NSScrollView()
     private let invTableView  = NSTableView()
-    private let emailField  = NSTextField()
-    private let inviteButton = NSButton(title: "초대", target: nil, action: nil)
-    private let errorLabel  = NSTextField(labelWithString: "")
-    private let invLabel    = NSTextField(labelWithString: "받은 초대")
+    private let sentScrollView = NSScrollView()
+    private let sentTableView  = NSTableView()
+    private let recvHistScrollView = NSScrollView()
+    private let recvHistTableView  = NSTableView()
+    private let emailField    = NSTextField()
+    private let inviteButton  = NSButton(title: "초대", target: nil, action: nil)
+    private let errorLabel    = NSTextField(labelWithString: "")
+    private let invLabel      = NSTextField(labelWithString: "받은 초대 (대기 중)")
+    private let sentLabel     = NSTextField(labelWithString: "보낸 초대 히스토리")
+    private let recvHistLabel = NSTextField(labelWithString: "받은 초대 히스토리")
 
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 520))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 720))
     }
 
     override func viewDidLoad() {
@@ -247,8 +280,62 @@ class SharePreferencesViewController: NSViewController {
             invScrollView.topAnchor.constraint(equalTo: invLabel.bottomAnchor, constant: 8),
             invScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             invScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            invScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
+            invScrollView.heightAnchor.constraint(equalToConstant: 100),
+
+            sentLabel.topAnchor.constraint(equalTo: invScrollView.bottomAnchor, constant: 16),
+            sentLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+
+            sentScrollView.topAnchor.constraint(equalTo: sentLabel.bottomAnchor, constant: 8),
+            sentScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            sentScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            sentScrollView.heightAnchor.constraint(equalToConstant: 100),
+
+            recvHistLabel.topAnchor.constraint(equalTo: sentScrollView.bottomAnchor, constant: 16),
+            recvHistLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+
+            recvHistScrollView.topAnchor.constraint(equalTo: recvHistLabel.bottomAnchor, constant: 8),
+            recvHistScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            recvHistScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            recvHistScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
         ])
+
+        // Sent history table (tag=2)
+        sentLabel.font = NSFont.boldSystemFont(ofSize: 13)
+        sentLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(sentLabel)
+
+        let sentNameCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
+        sentNameCol.title = "받는 사람"; sentNameCol.width = 200
+        let sentStatusCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("status"))
+        sentStatusCol.title = "상태"; sentStatusCol.width = 80
+        sentTableView.addTableColumn(sentNameCol)
+        sentTableView.addTableColumn(sentStatusCol)
+        sentTableView.delegate = self; sentTableView.dataSource = self
+        sentTableView.rowHeight = 26; sentTableView.headerView = NSTableHeaderView()
+        sentTableView.tag = 2
+        sentScrollView.documentView = sentTableView
+        sentScrollView.hasVerticalScroller = true; sentScrollView.borderType = .bezelBorder
+        sentScrollView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(sentScrollView)
+
+        // Received history table (tag=3)
+        recvHistLabel.font = NSFont.boldSystemFont(ofSize: 13)
+        recvHistLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(recvHistLabel)
+
+        let recvNameCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
+        recvNameCol.title = "보낸 사람"; recvNameCol.width = 200
+        let recvStatusCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("status"))
+        recvStatusCol.title = "상태"; recvStatusCol.width = 80
+        recvHistTableView.addTableColumn(recvNameCol)
+        recvHistTableView.addTableColumn(recvStatusCol)
+        recvHistTableView.delegate = self; recvHistTableView.dataSource = self
+        recvHistTableView.rowHeight = 26; recvHistTableView.headerView = NSTableHeaderView()
+        recvHistTableView.tag = 3
+        recvHistScrollView.documentView = recvHistTableView
+        recvHistScrollView.hasVerticalScroller = true; recvHistScrollView.borderType = .bezelBorder
+        recvHistScrollView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(recvHistScrollView)
     }
 
     // MARK: – Data
@@ -257,7 +344,8 @@ class SharePreferencesViewController: NSViewController {
         Task {
             async let partnerList = ShareAPI.listPartners()
             async let invList = ShareAPI.listInvitations()
-            let (p, i) = (try? await partnerList, try? await invList)
+            async let history = ShareAPI.fetchHistory()
+            let (p, i, h) = (try? await partnerList, try? await invList, try? await history)
             await MainActor.run {
                 self.partners = p ?? []
                 self.invitations = (i ?? []).compactMap { dict in
@@ -266,8 +354,12 @@ class SharePreferencesViewController: NSViewController {
                           let email = dict["fromEmail"] as? String else { return nil }
                     return Invitation(id: id, fromUsername: name, fromEmail: email)
                 }
+                self.sentHistory = h?.sent ?? []
+                self.receivedHistory = h?.received ?? []
                 self.tableView.reloadData()
                 self.invTableView.reloadData()
+                self.sentTableView.reloadData()
+                self.recvHistTableView.reloadData()
             }
         }
     }
@@ -354,7 +446,13 @@ class SharePreferencesViewController: NSViewController {
 
 extension SharePreferencesViewController: NSTableViewDataSource, NSTableViewDelegate {
     func numberOfRows(in tableView: NSTableView) -> Int {
-        tableView.tag == 0 ? partners.count : invitations.count
+        switch tableView.tag {
+        case 0: return partners.count
+        case 1: return invitations.count
+        case 2: return sentHistory.count
+        case 3: return receivedHistory.count
+        default: return 0
+        }
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -375,7 +473,8 @@ extension SharePreferencesViewController: NSTableViewDataSource, NSTableViewDele
             cell.font = NSFont.systemFont(ofSize: 12)
             cell.textColor = colId == "email" ? NSColor.secondaryLabelColor : NSColor.labelColor
             return cell
-        } else {
+
+        } else if tableView.tag == 1 {
             // Invitations table
             let inv = invitations[row]
             if colId == "accept" {
@@ -393,6 +492,40 @@ extension SharePreferencesViewController: NSTableViewDataSource, NSTableViewDele
                 return btn
             }
             let cell = NSTextField(labelWithString: "\(inv.fromUsername) (\(inv.fromEmail))")
+            cell.font = NSFont.systemFont(ofSize: 12)
+            return cell
+
+        } else if tableView.tag == 2 {
+            // Sent history table
+            let item = sentHistory[row]
+            if colId == "status" {
+                let statusMap = ["pending": "대기 중", "accepted": "수락됨", "rejected": "거절됨"]
+                let colorMap: [String: NSColor] = ["pending": .systemOrange, "accepted": .systemGreen, "rejected": .systemRed]
+                let cell = NSTextField(labelWithString: statusMap[item.status] ?? item.status)
+                cell.font = NSFont.systemFont(ofSize: 11)
+                cell.textColor = colorMap[item.status] ?? .secondaryLabelColor
+                return cell
+            }
+            let name = item.toUsername ?? ""
+            let email = item.toEmail ?? ""
+            let cell = NSTextField(labelWithString: "\(name) (\(email))")
+            cell.font = NSFont.systemFont(ofSize: 12)
+            return cell
+
+        } else {
+            // Received history table (tag == 3)
+            let item = receivedHistory[row]
+            if colId == "status" {
+                let statusMap = ["pending": "대기 중", "accepted": "수락됨", "rejected": "거절됨"]
+                let colorMap: [String: NSColor] = ["pending": .systemOrange, "accepted": .systemGreen, "rejected": .systemRed]
+                let cell = NSTextField(labelWithString: statusMap[item.status] ?? item.status)
+                cell.font = NSFont.systemFont(ofSize: 11)
+                cell.textColor = colorMap[item.status] ?? .secondaryLabelColor
+                return cell
+            }
+            let name = item.fromUsername ?? ""
+            let email = item.fromEmail ?? ""
+            let cell = NSTextField(labelWithString: "\(name) (\(email))")
             cell.font = NSFont.systemFont(ofSize: 12)
             return cell
         }

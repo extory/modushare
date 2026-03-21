@@ -42,6 +42,7 @@
     <button class="tab active" data-tab="partners">공유 중</button>
     <button class="tab" data-tab="invite">초대 보내기</button>
     <button class="tab" data-tab="incoming">받은 초대 <span class="badge" id="invBadge" style="display:none"></span></button>
+    <button class="tab" data-tab="history">히스토리</button>
   </div>
 
   <!-- 공유 중 탭 -->
@@ -66,6 +67,18 @@
   <div class="tab-content section" id="tab-incoming">
     <ul class="list" id="invList">
       <li class="empty" id="invEmpty">받은 초대가 없습니다</li>
+    </ul>
+  </div>
+
+  <!-- 히스토리 탭 -->
+  <div class="tab-content section" id="tab-history">
+    <p style="font-size:0.8rem;font-weight:600;color:#888;margin-bottom:6px;">보낸 초대</p>
+    <ul class="list" id="sentList">
+      <li class="empty" id="sentEmpty">보낸 초대가 없습니다</li>
+    </ul>
+    <p style="font-size:0.8rem;font-weight:600;color:#888;margin:12px 0 6px;">받은 초대</p>
+    <ul class="list" id="receivedList">
+      <li class="empty" id="receivedEmpty">받은 초대가 없습니다</li>
     </ul>
   </div>
 
@@ -171,6 +184,54 @@
         errEl.style.display = 'block';
       }
     });
+
+    // ── 히스토리 ──
+    const statusLabel = { pending: '대기 중', accepted: '수락됨', rejected: '거절됨' };
+    const statusColor = { pending: '#f59e0b', accepted: '#22c55e', rejected: '#ef4444' };
+
+    async function loadHistory() {
+      const result = await ipcRenderer.invoke('share:history');
+      if (!result.ok) return;
+
+      const sentList = document.getElementById('sentList');
+      const sentEmpty = document.getElementById('sentEmpty');
+      sentList.querySelectorAll('.hist-item').forEach(el => el.remove());
+      const sent = result.sent || [];
+      sentEmpty.style.display = sent.length === 0 ? 'block' : 'none';
+      sent.forEach(inv => {
+        const li = document.createElement('li');
+        li.className = 'item hist-item';
+        li.innerHTML = `
+          <div class="info">
+            <span class="name">${escHtml(inv.toUsername)}</span>
+            <span class="email">${escHtml(inv.toEmail)}</span>
+          </div>
+          <span style="font-size:0.75rem;color:${statusColor[inv.status]||'#888'}">${statusLabel[inv.status]||inv.status}</span>
+        `;
+        sentList.appendChild(li);
+      });
+
+      const recvList = document.getElementById('receivedList');
+      const recvEmpty = document.getElementById('receivedEmpty');
+      recvList.querySelectorAll('.hist-item').forEach(el => el.remove());
+      const received = result.received || [];
+      recvEmpty.style.display = received.length === 0 ? 'block' : 'none';
+      received.forEach(inv => {
+        const li = document.createElement('li');
+        li.className = 'item hist-item';
+        li.innerHTML = `
+          <div class="info">
+            <span class="name">${escHtml(inv.fromUsername)}</span>
+            <span class="email">${escHtml(inv.fromEmail)}</span>
+          </div>
+          <span style="font-size:0.75rem;color:${statusColor[inv.status]||'#888'}">${statusLabel[inv.status]||inv.status}</span>
+        `;
+        recvList.appendChild(li);
+      });
+    }
+
+    // 히스토리 탭 클릭 시 로드
+    document.querySelector('[data-tab="history"]').addEventListener('click', loadHistory);
 
     // ── 실시간 초대 알림 ──
     ipcRenderer.on('share:newInvitation', () => {

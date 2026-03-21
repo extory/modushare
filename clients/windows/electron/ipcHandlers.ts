@@ -276,6 +276,20 @@ export function setupIpcHandlers(
     }
   });
 
+  // ── Share: history (sent + received) ──────────────────────────────────────
+  ipcMain.handle('share:history', async () => {
+    const serverUrl = store.get('serverUrl');
+    const token = store.get('accessToken');
+    try {
+      const { data } = await axios.get(`${serverUrl}/share/history`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return { ok: true, sent: data.sent, received: data.received };
+    } catch {
+      return { ok: false, sent: [], received: [] };
+    }
+  });
+
   // ── Share: invitations list ────────────────────────────────────────────────
   ipcMain.handle('share:invitations', async () => {
     const serverUrl = store.get('serverUrl');
