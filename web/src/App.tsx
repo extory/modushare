@@ -8,7 +8,7 @@ import { DownloadButton } from './components/DownloadButton';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useClipboardStore } from './store/clipboardStore';
 import { endpoints } from './api/endpoints';
-import { User, ClipboardItem } from './types';
+import { User, ClipboardItem, ShareInvitation } from './types';
 import { WSMessage, ClipboardUpdatePayload } from '@modushare/shared';
 
 // Stable device ID for this browser session
@@ -25,6 +25,7 @@ export default function App() {
   const [token, setToken] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [pendingInvitations, setPendingInvitations] = useState<ShareInvitation[]>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasShownFirstCopyToast = useRef(false);
 
@@ -83,6 +84,28 @@ export default function App() {
         case 'SYNC_DISABLE':
           setSyncEnabled(false);
           break;
+        case 'SHARE_INVITATION': {
+          const inv = msg.payload as { fromId: string; fromUsername: string; fromEmail: string };
+          const newInv: ShareInvitation = {
+            id: `${inv.fromId}-${Date.now()}`,
+            fromId: inv.fromId,
+            fromUsername: inv.fromUsername,
+            fromEmail: inv.fromEmail,
+            createdAt: msg.timestamp,
+          };
+          setPendingInvitations((prev) => [newInv, ...prev]);
+          showToast(`📨 ${inv.fromUsername}님이 클립보드 공유를 요청했습니다`);
+          // 실제 id를 서버에서 가져옴
+          endpoints.getShareInvitations().then(({ invitations }) => {
+            setPendingInvitations(invitations);
+          }).catch(() => {});
+          break;
+        }
+        case 'SHARE_ACCEPTED': {
+          const acc = msg.payload as { byUsername: string };
+          showToast(`✅ ${acc.byUsername}님이 공유 초대를 수락했습니다`);
+          break;
+        }
         default:
           break;
       }
@@ -106,6 +129,9 @@ export default function App() {
       .then((resp) => setItems(resp.items))
       .catch(console.error)
       .finally(() => setHistoryLoading(false));
+    endpoints.getShareInvitations()
+      .then(({ invitations }) => setPendingInvitations(invitations))
+      .catch(() => {});
   }, [user, setItems, setSyncEnabled]);
 
   // ─── Listen for auth expiry ──────────────────────────────────────────────────
@@ -170,7 +196,10 @@ export default function App() {
             title={isConnected ? 'Connected' : 'Reconnecting…'}
           />
           <SyncToggle enabled={syncEnabled} onToggle={handleSyncToggle} />
-          <ShareManager />
+          <ShareManager
+            pendingInvitations={pendingInvitations}
+            onInvitationHandled={(id) => setPendingInvitations((prev) => prev.filter((i) => i.id !== id))}
+          />
           <DownloadButton />
           <span style={styles.username}>{user.username}</span>
           <button style={styles.logoutBtn} onClick={handleLogout}>

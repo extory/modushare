@@ -36,7 +36,9 @@ export type WSMessageType =
   | 'PING'
   | 'PONG'
   | 'ERROR'
-  | 'CLIPBOARD_ACK';
+  | 'CLIPBOARD_ACK'
+  | 'SHARE_INVITATION'
+  | 'SHARE_ACCEPTED';
 
 // ─── Generic envelope ────────────────────────────────────────────────────────
 

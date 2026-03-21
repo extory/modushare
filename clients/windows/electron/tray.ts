@@ -103,6 +103,10 @@ export function createTray(
         },
       },
       {
+        label: '공유 관리…',
+        click: () => openShareWindow(),
+      },
+      {
         label: 'Preferences…',
         click: () => openPreferencesWindow(),
       },
@@ -150,8 +154,28 @@ export function createTray(
 
   updateMenu();
   wsClient.on('statusChange', updateMenu);
+  wsClient.on('shareInvitation', () => {
+    // 공유 관리 창이 열려있으면 알림 전송
+    const { BrowserWindow } = require('electron');
+    BrowserWindow.getAllWindows().forEach((win: Electron.BrowserWindow) => {
+      if (!win.isDestroyed()) win.webContents.send('share:newInvitation');
+    });
+  });
 
   return tray;
+}
+
+function openShareWindow(): void {
+  const { BrowserWindow } = require('electron');
+  const path = require('path');
+  const win = new BrowserWindow({
+    width: 480,
+    height: 500,
+    resizable: false,
+    title: 'ModuShare – 공유 관리',
+    webPreferences: { nodeIntegration: true, contextIsolation: false },
+  });
+  win.loadFile(path.join(__dirname, '../../renderer/share.html'));
 }
 
 function openPreferencesWindow(): void {

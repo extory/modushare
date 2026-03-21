@@ -225,6 +225,65 @@ export function setupIpcHandlers(
     }
   });
 
+  // ── Share: invite ──────────────────────────────────────────────────────────
+  ipcMain.handle('share:invite', async (_event, email: string) => {
+    const serverUrl = store.get('serverUrl');
+    const token = store.get('accessToken');
+    try {
+      const { data } = await axios.post(
+        `${serverUrl}/share/invite`,
+        { email },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return { ok: true, ...data };
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? '초대 실패';
+      return { ok: false, error: message };
+    }
+  });
+
+  // ── Share: invitations list ────────────────────────────────────────────────
+  ipcMain.handle('share:invitations', async () => {
+    const serverUrl = store.get('serverUrl');
+    const token = store.get('accessToken');
+    try {
+      const { data } = await axios.get(`${serverUrl}/share/invitations`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return { ok: true, invitations: data.invitations };
+    } catch {
+      return { ok: false, invitations: [] };
+    }
+  });
+
+  // ── Share: accept ──────────────────────────────────────────────────────────
+  ipcMain.handle('share:accept', async (_event, invId: string) => {
+    const serverUrl = store.get('serverUrl');
+    const token = store.get('accessToken');
+    try {
+      await axios.post(`${serverUrl}/share/invitations/${invId}/accept`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  });
+
+  // ── Share: reject ──────────────────────────────────────────────────────────
+  ipcMain.handle('share:reject', async (_event, invId: string) => {
+    const serverUrl = store.get('serverUrl');
+    const token = store.get('accessToken');
+    try {
+      await axios.post(`${serverUrl}/share/invitations/${invId}/reject`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  });
+
   // ── Logout ─────────────────────────────────────────────────────────────────
   ipcMain.handle('auth:logout', async () => {
     const serverUrl = store.get('serverUrl');

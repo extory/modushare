@@ -1,5 +1,5 @@
 import { apiClient, setAccessToken } from './client';
-import { LoginResponse, HistoryResponse, SharePartner } from '../types';
+import { LoginResponse, HistoryResponse, SharePartner, ShareInvitation } from '../types';
 
 export const endpoints = {
   async login(email: string, password: string): Promise<LoginResponse> {
@@ -55,13 +55,26 @@ export const endpoints = {
     return data;
   },
 
-  async addSharePartner(email: string): Promise<SharePartner> {
-    const { data } = await apiClient.post<SharePartner>('/share', { email });
+  async removeSharePartner(targetId: string): Promise<void> {
+    await apiClient.delete(`/share/${targetId}`);
+  },
+
+  async sendShareInvitation(email: string): Promise<{ ok: boolean; toEmail: string; toUsername: string }> {
+    const { data } = await apiClient.post('/share/invite', { email });
     return data;
   },
 
-  async removeSharePartner(targetId: string): Promise<void> {
-    await apiClient.delete(`/share/${targetId}`);
+  async getShareInvitations(): Promise<{ invitations: ShareInvitation[] }> {
+    const { data } = await apiClient.get<{ invitations: ShareInvitation[] }>('/share/invitations');
+    return data;
+  },
+
+  async acceptInvitation(id: string): Promise<void> {
+    await apiClient.post(`/share/invitations/${id}/accept`);
+  },
+
+  async rejectInvitation(id: string): Promise<void> {
+    await apiClient.post(`/share/invitations/${id}/reject`);
   },
 
   async uploadImage(blob: Blob): Promise<{ imageUrl: string }> {

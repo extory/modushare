@@ -198,6 +198,25 @@ export class WSClient extends EventEmitter {
         this.emit('statusChange');
         break;
 
+      case 'SHARE_INVITATION': {
+        const inv = msg.payload as { fromUsername?: string };
+        new Notification({
+          title: 'ModuShare – 공유 초대',
+          body: `${inv.fromUsername ?? '누군가'}님이 클립보드 공유를 요청했습니다`,
+        }).show();
+        this.emit('shareInvitation');
+        break;
+      }
+
+      case 'SHARE_ACCEPTED': {
+        const acc = msg.payload as { byUsername?: string };
+        new Notification({
+          title: 'ModuShare',
+          body: `${acc.byUsername ?? '상대방'}님이 공유 초대를 수락했습니다`,
+        }).show();
+        break;
+      }
+
       default:
         break;
     }

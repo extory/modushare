@@ -35,3 +35,11 @@ export interface SharePartner {
   username: string;
   email: string;
 }
+
+export interface ShareInvitation {
+  id: string;
+  fromId: string;
+  fromUsername: string;
+  fromEmail: string;
+  createdAt: number;
+}
