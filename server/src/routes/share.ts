@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '../db';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
 import { userSessions } from '../websocket/userSessions';
+import { emailService } from '../services/emailService';
 
 const router = Router();
 
@@ -127,7 +128,7 @@ router.get('/history', requireAuth, (req: Request, res: Response) => {
 });
 
 // ─── POST /share/email-invite – send signup invitation email to non-member ───
-router.post('/email-invite', requireAuth, (req: Request, res: Response, next: NextFunction) => {
+router.post('/email-invite', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { userId } = (req as AuthenticatedRequest).user;
     const { email } = req.body as { email?: string };
@@ -137,11 +138,8 @@ router.post('/email-invite', requireAuth, (req: Request, res: Response, next: Ne
       'SELECT id, username, email FROM users WHERE id = ?'
     ).get(userId) as UserRow;
 
-    // Log the email invite attempt (no-op if no email provider configured)
     console.log(`[share] Email invite from ${fromUser.email} to ${email}`);
-
-    // In production you'd send an actual email here.
-    // For now we just return ok so the client knows the request was received.
+    await emailService.sendShareInvite(fromUser.username, fromUser.email, email);
     res.json({ ok: true, fromUsername: fromUser.username, toEmail: email });
   } catch (err) { next(err); }
 });

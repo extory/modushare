@@ -23,4 +23,9 @@ export const config = {
   UPLOAD_DIR: process.env['UPLOAD_DIR'] ?? path.resolve('./uploads'),
   CORS_ORIGIN: process.env['CORS_ORIGIN'] ?? 'http://localhost:5173',
   NODE_ENV: process.env['NODE_ENV'] ?? 'development',
+  SMTP_HOST: process.env['SMTP_HOST'] ?? 'smtp.gmail.com',
+  SMTP_PORT: parseInt(process.env['SMTP_PORT'] ?? '587', 10),
+  SMTP_USER: process.env['SMTP_USER'] ?? '',
+  SMTP_PASS: process.env['SMTP_PASS'] ?? '',
+  SMTP_FROM: process.env['SMTP_FROM'] ?? 'ModuShare <admin@extory.co>',
 } as const;
