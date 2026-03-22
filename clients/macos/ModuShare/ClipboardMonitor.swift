@@ -56,9 +56,7 @@ class ClipboardMonitor {
             lastContentHash = hash
             onChange?(ClipboardContent(contentType: "text", text: text, imageData: nil))
 
-        } else if let image = pasteboard.data(forType: .tiff),
-                  let tiff = NSBitmapImageRep(data: image),
-                  let pngData = tiff.representation(using: .png, properties: [:]) {
+        } else if let pngData = extractPNG(from: pasteboard) {
             let hash = sha256(pngData)
             guard hash != lastReceivedHash else {
                 lastReceivedHash = ""
@@ -70,6 +68,29 @@ class ClipboardMonitor {
     }
 
     // MARK: – Helpers
+
+    /// Extracts PNG data from pasteboard, checking multiple image types.
+    /// macOS screenshots use .png directly; other sources may use .tiff.
+    private func extractPNG(from pasteboard: NSPasteboard) -> Data? {
+        // 1. Try PNG directly (macOS screenshots, web images)
+        if let pngData = pasteboard.data(forType: .init("public.png")), !pngData.isEmpty {
+            return pngData
+        }
+        // 2. Try TIFF → convert to PNG
+        if let tiffData = pasteboard.data(forType: .tiff),
+           let rep = NSBitmapImageRep(data: tiffData),
+           let pngData = rep.representation(using: .png, properties: [:]) {
+            return pngData
+        }
+        // 3. Try reading as NSImage (catches any remaining image types)
+        if let images = pasteboard.readObjects(forClasses: [NSImage.self]) as? [NSImage],
+           let image = images.first,
+           let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            let rep = NSBitmapImageRep(cgImage: cgImage)
+            return rep.representation(using: .png, properties: [:])
+        }
+        return nil
+    }
 
     private func sha256(_ data: Data) -> String {
         let digest = SHA256.hash(data: data)
