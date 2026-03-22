@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, session } from 'electron';
+import { ipcMain, BrowserWindow, session, dialog } from 'electron';
 import axios from 'axios';
 import http from 'http';
 import Store from 'electron-store';
@@ -230,6 +230,36 @@ export function setupIpcHandlers(
     }
   });
 
+  // ── Dialog: confirm ────────────────────────────────────────────────────────
+  ipcMain.handle('dialog:confirm', async (_event, message: string) => {
+    const result = await dialog.showMessageBox({
+      type: 'question',
+      buttons: ['보내기', '취소'],
+      defaultId: 0,
+      cancelId: 1,
+      message: '미가입 이메일',
+      detail: message,
+    });
+    return result.response === 0;
+  });
+
+  // ── Share: email invite (non-member) ───────────────────────────────────────
+  ipcMain.handle('share:emailInvite', async (_event, email: string) => {
+    const serverUrl = store.get('serverUrl');
+    const token = store.get('accessToken');
+    try {
+      const { data } = await axios.post(
+        `${serverUrl}/share/email-invite`,
+        { email },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return { ok: true, ...data };
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? '초대 이메일 전송 실패';
+      return { ok: false, error: message };
+    }
+  });
+
   // ── Share: add ─────────────────────────────────────────────────────────────
   ipcMain.handle('share:add', async (_event, email: string) => {
     const serverUrl = store.get('serverUrl');
@@ -274,7 +304,9 @@ export function setupIpcHandlers(
       );
       return { ok: true, ...data };
     } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
       const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? '초대 실패';
+      if (status === 404) return { ok: false, notMember: true, error: message };
       return { ok: false, error: message };
     }
   });

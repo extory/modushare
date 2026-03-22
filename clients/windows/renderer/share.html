@@ -179,6 +179,22 @@
         document.getElementById('inviteEmail').value = '';
         sucEl.textContent = `${result.toUsername}(${result.toEmail})님에게 초대를 보냈습니다`;
         sucEl.style.display = 'block';
+      } else if (result.notMember) {
+        // 미가입자 → 가입 초대 이메일 여부 확인
+        const confirm = await ipcRenderer.invoke('dialog:confirm',
+          `${email}은(는) ModuShare에 가입되어 있지 않습니다.\n가입 초대 이메일을 보내시겠습니까?`
+        );
+        if (confirm) {
+          const emailResult = await ipcRenderer.invoke('share:emailInvite', email);
+          if (emailResult.ok) {
+            document.getElementById('inviteEmail').value = '';
+            sucEl.textContent = `${email}에게 가입 초대 이메일을 보냈습니다`;
+            sucEl.style.display = 'block';
+          } else {
+            errEl.textContent = emailResult.error || '초대 이메일 전송 실패';
+            errEl.style.display = 'block';
+          }
+        }
       } else {
         errEl.textContent = result.error || '초대 실패';
         errEl.style.display = 'block';

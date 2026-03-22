@@ -68,10 +68,39 @@ class SyncManager: NSObject {
         sendSyncToggle(enabled: false)
     }
 
+    // MARK: – Reconnect with token refresh
+
+    func reconnectWithRefresh() {
+        Task {
+            // Try to refresh token first
+            if let token = AuthManager.shared.accessToken,
+               let url = URL(string: "\(AuthManager.shared.serverURL)/auth/refresh") {
+                var req = URLRequest(url: url)
+                req.httpMethod = "POST"
+                req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                if let (data, _) = try? await AuthManager.cookieSession.data(for: req),
+                   let json = try? JSONDecoder().decode(RefreshResponse.self, from: data) {
+                    AuthManager.shared.accessToken = json.accessToken
+                }
+            }
+            await MainActor.run {
+                wsClient?.disconnect()
+                wsClient = nil
+                start()
+            }
+        }
+    }
+
     // MARK: – Outbound (local -> server)
 
     private func handleLocalClipboardChange(_ content: ClipboardContent) {
-        guard isSyncEnabled, isConnected else { return }
+        guard isSyncEnabled else { return }
+
+        // Auto-reconnect on copy if disconnected
+        if !isConnected {
+            reconnectWithRefresh()
+            return
+        }
 
         if content.contentType == "text", let text = content.text {
             let msg = WSMessage(

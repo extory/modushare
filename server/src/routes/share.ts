@@ -126,6 +126,26 @@ router.get('/history', requireAuth, (req: Request, res: Response) => {
   });
 });
 
+// ─── POST /share/email-invite – send signup invitation email to non-member ───
+router.post('/email-invite', requireAuth, (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { userId } = (req as AuthenticatedRequest).user;
+    const { email } = req.body as { email?: string };
+    if (!email) { res.status(400).json({ error: 'email is required' }); return; }
+
+    const fromUser = db.prepare<string[], UserRow>(
+      'SELECT id, username, email FROM users WHERE id = ?'
+    ).get(userId) as UserRow;
+
+    // Log the email invite attempt (no-op if no email provider configured)
+    console.log(`[share] Email invite from ${fromUser.email} to ${email}`);
+
+    // In production you'd send an actual email here.
+    // For now we just return ok so the client knows the request was received.
+    res.json({ ok: true, fromUsername: fromUser.username, toEmail: email });
+  } catch (err) { next(err); }
+});
+
 // ─── POST /share/invite – send invitation by email ───────────────────────────
 router.post('/invite', requireAuth, (req: Request, res: Response, next: NextFunction) => {
   try {

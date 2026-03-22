@@ -88,6 +88,14 @@ export class WSClient extends EventEmitter {
     }
   }
 
+  reconnectNow(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.tryRefreshToken().then(() => this.connect());
+  }
+
   disconnect(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);

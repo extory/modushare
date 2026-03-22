@@ -37,6 +37,22 @@ actor ShareAPI {
         }
     }
 
+    static func sendEmailInvite(email: String) async throws {
+        guard let url = URL(string: "\(await AuthManager.shared.serverURL)/share/email-invite") else {
+            throw URLError(.badURL)
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(["email": email])
+        let (data, response) = try await AuthManager.shared.authenticatedData(for: req)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            let errBody = try? JSONDecoder().decode([String: String].self, from: data)
+            throw NSError(domain: "ShareError", code: http.statusCode,
+                          userInfo: [NSLocalizedDescriptionKey: errBody?["error"] ?? "초대 실패"])
+        }
+    }
+
     static func listInvitations() async throws -> [[String: Any]] {
         guard let url = URL(string: "\(await AuthManager.shared.serverURL)/share/invitations") else {
             throw URLError(.badURL)
@@ -385,16 +401,41 @@ class SharePreferencesViewController: NSViewController {
                     self.errorLabel.isHidden = false
                 }
             } catch let error as NSError {
-                await MainActor.run {
-                    let msg: String
-                    switch error.code {
-                    case 404: msg = "등록되지 않은 이메일입니다."
-                    case 409: msg = error.localizedDescription
-                    default:  msg = error.localizedDescription
+                if error.code == 404 {
+                    // Not a member — ask to send signup invitation email
+                    await MainActor.run {
+                        self.inviteButton.isEnabled = true
+                        let alert = NSAlert()
+                        alert.messageText = "미가입 이메일입니다"
+                        alert.informativeText = "\(email)은(는) ModuShare에 가입되어 있지 않습니다.\n가입 초대 이메일을 보내시겠습니까?"
+                        alert.addButton(withTitle: "초대 이메일 보내기")
+                        alert.addButton(withTitle: "취소")
+                        alert.alertStyle = .informational
+                        let response = alert.runModal()
+                        if response == .alertFirstButtonReturn {
+                            Task {
+                                do {
+                                    try await ShareAPI.sendEmailInvite(email: email)
+                                    await MainActor.run {
+                                        self.emailField.stringValue = ""
+                                        self.errorLabel.stringValue = "가입 초대 이메일을 보냈습니다."
+                                        self.errorLabel.textColor = NSColor.systemGreen
+                                        self.errorLabel.isHidden = false
+                                    }
+                                } catch {
+                                    await MainActor.run {
+                                        self.showError("초대 이메일 전송에 실패했습니다.")
+                                    }
+                                }
+                            }
+                        }
                     }
-                    self.errorLabel.textColor = NSColor.systemRed
-                    self.showError(msg)
-                    self.inviteButton.isEnabled = true
+                } else {
+                    await MainActor.run {
+                        self.errorLabel.textColor = NSColor.systemRed
+                        self.showError(error.localizedDescription)
+                        self.inviteButton.isEnabled = true
+                    }
                 }
             }
         }

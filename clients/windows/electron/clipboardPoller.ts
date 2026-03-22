@@ -64,6 +64,12 @@ export class ClipboardPoller extends EventEmitter {
       if (textHash === this.lastReceivedHash) return; // echo prevention
       this.lastReceivedHash = '';
 
+      // Auto-reconnect if disconnected
+      if (!this.wsClient.isConnected()) {
+        this.wsClient.reconnectNow();
+        return;
+      }
+
       this.wsClient.sendClipboardUpdate({
         type: 'text',
         text: currentText,
