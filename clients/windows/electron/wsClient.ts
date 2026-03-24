@@ -176,15 +176,37 @@ export class WSClient extends EventEmitter {
             .digest('hex');
           if (this.poller) this.poller.lastReceivedHash = hash;
           clipboard.writeText(payload.content);
-        } else if (payload.contentType === 'image' && payload.imageData) {
-          const buf = Buffer.from(payload.imageData, 'base64');
-          const hash = crypto.createHash('sha256').update(buf).digest('hex');
-          if (this.poller) this.poller.lastReceivedHash = hash;
-          const img = nativeImage.createFromBuffer(buf);
-          clipboard.writeImage(img);
+          this.emit('remoteClipboard');
+        } else if (payload.contentType === 'image') {
+          if (payload.imageData) {
+            const buf = Buffer.from(payload.imageData, 'base64');
+            const hash = crypto.createHash('sha256').update(buf).digest('hex');
+            if (this.poller) this.poller.lastReceivedHash = hash;
+            const img = nativeImage.createFromBuffer(buf);
+            clipboard.writeImage(img);
+            this.emit('remoteClipboard');
+          } else if (payload.imageUrl) {
+            // Download image from server and write to clipboard
+            const serverUrl = this.store.get('serverUrl');
+            const token = this.store.get('accessToken');
+            const fullUrl = payload.imageUrl.startsWith('http')
+              ? payload.imageUrl
+              : `${serverUrl}${payload.imageUrl}`;
+            axios.get(fullUrl, {
+              responseType: 'arraybuffer',
+              headers: { Authorization: `Bearer ${token}` },
+            }).then((res) => {
+              const buf = Buffer.from(res.data as ArrayBuffer);
+              const hash = crypto.createHash('sha256').update(buf).digest('hex');
+              if (this.poller) this.poller.lastReceivedHash = hash;
+              const img = nativeImage.createFromBuffer(buf);
+              clipboard.writeImage(img);
+              this.emit('remoteClipboard');
+            }).catch((err) => {
+              console.error('[ws] Failed to download image:', err.message);
+            });
+          }
         }
-        // 다른 기기에서 복사한 내역 → 트레이 이펙트 발동
-        this.emit('remoteClipboard');
         break;
       }
 
