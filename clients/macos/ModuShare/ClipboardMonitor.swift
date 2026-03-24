@@ -11,7 +11,7 @@ class ClipboardMonitor {
 
     var onChange: ((ClipboardContent) -> Void)?
 
-    private var lastChangeCount: Int = NSPasteboard.general.changeCount
+    var lastChangeCount: Int = NSPasteboard.general.changeCount
     private var lastContentHash: String = ""
     private var timer: Timer?
 

@@ -148,27 +148,28 @@ class SyncManager: NSObject {
             clipboardMonitor.lastReceivedHash = hash
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
+            clipboardMonitor.lastChangeCount = pasteboard.changeCount
 
         } else if payload.contentType == "image" {
             if let base64 = payload.imageData,
                let imageData = Data(base64Encoded: base64) {
-                let hash = sha256(imageData)
-                clipboardMonitor.lastReceivedHash = hash
                 if let image = NSImage(data: imageData) {
+                    let hash = sha256(imageData)
+                    clipboardMonitor.lastReceivedHash = hash
                     pasteboard.clearContents()
                     pasteboard.writeObjects([image])
+                    clipboardMonitor.lastChangeCount = pasteboard.changeCount
                 }
             } else if let imageUrl = payload.imageUrl {
                 Task {
                     if let data = await downloadImage(from: imageUrl) {
                         let hash = sha256(data)
-                        await MainActor.run {
-                            self.clipboardMonitor.lastReceivedHash = hash
-                        }
                         if let image = NSImage(data: data) {
                             await MainActor.run {
+                                self.clipboardMonitor.lastReceivedHash = hash
                                 pasteboard.clearContents()
                                 pasteboard.writeObjects([image])
+                                self.clipboardMonitor.lastChangeCount = pasteboard.changeCount
                             }
                         }
                     }
