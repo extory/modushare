@@ -87,7 +87,7 @@ export function createTray(
         enabled: false,
       },
       {
-        label: userEmail ? `계정: ${userEmail}` : '로그인 안됨',
+        label: store.get('accessToken') ? (userEmail ? `계정: ${userEmail}` : '로그인됨') : '로그인 안됨',
         enabled: false,
       },
       { type: 'separator' },

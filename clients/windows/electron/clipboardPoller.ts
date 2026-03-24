@@ -21,8 +21,8 @@ function hashBuffer(buf: Buffer): string {
 export class ClipboardPoller extends EventEmitter {
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastText = '';
-  private lastImageHash = '';
   // Set by WSClient when it writes to clipboard to prevent echo
+  public lastImageHash = '';
   public lastReceivedHash = '';
 
   constructor(

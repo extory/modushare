@@ -180,9 +180,13 @@ export class WSClient extends EventEmitter {
         } else if (payload.contentType === 'image') {
           if (payload.imageData) {
             const buf = Buffer.from(payload.imageData, 'base64');
-            const hash = crypto.createHash('sha256').update(buf).digest('hex');
-            if (this.poller) this.poller.lastReceivedHash = hash;
             const img = nativeImage.createFromBuffer(buf);
+            const pngBuf = img.toPNG();
+            const hash = crypto.createHash('sha256').update(pngBuf).digest('hex');
+            if (this.poller) {
+              this.poller.lastReceivedHash = hash;
+              this.poller.lastImageHash = hash;
+            }
             clipboard.writeImage(img);
             this.emit('remoteClipboard');
           } else if (payload.imageUrl) {
@@ -200,14 +204,18 @@ export class WSClient extends EventEmitter {
               const buf = Buffer.from(res.data as ArrayBuffer);
               console.log('[ws] Image downloaded, size:', buf.length, 'bytes');
               const img = nativeImage.createFromBuffer(buf);
-              console.log('[ws] nativeImage empty?', img.isEmpty(), 'size:', img.getSize());
               if (img.isEmpty()) {
                 console.error('[ws] nativeImage is empty, clipboard write skipped');
                 return;
               }
               const pngBuf = img.toPNG();
               const hash = crypto.createHash('sha256').update(pngBuf).digest('hex');
-              if (this.poller) this.poller.lastReceivedHash = hash;
+              // Set BOTH lastReceivedHash and lastImageHash before writing
+              // to prevent poller from detecting the change and re-sending
+              if (this.poller) {
+                this.poller.lastReceivedHash = hash;
+                this.poller.lastImageHash = hash;
+              }
               clipboard.writeImage(img);
               this.emit('remoteClipboard');
               console.log('[ws] Image written to clipboard');
