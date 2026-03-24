@@ -91,7 +91,7 @@ jobs:
         with:
           name: ModuShare-macOS
           path: |
-            clients/windows/release/*.zip
+            clients/windows/release/*.dmg
             clients/windows/release/latest-mac.yml
 
   # ── GitHub Release (tag push 시에만 실행) ────────────────────────────────────
