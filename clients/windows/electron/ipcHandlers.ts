@@ -1,6 +1,9 @@
-import { ipcMain, BrowserWindow, session, dialog } from 'electron';
+import { ipcMain, BrowserWindow, session, dialog, shell } from 'electron';
 import axios from 'axios';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import FormData from 'form-data';
 import Store from 'electron-store';
 import { AppStore, getLoginWindow } from './main';
 import { WSClient } from './wsClient';
@@ -364,6 +367,54 @@ export function setupIpcHandlers(
       return { ok: true };
     } catch {
       return { ok: false };
+    }
+  });
+
+  // ── File: send ─────────────────────────────────────────────────────────────
+  ipcMain.handle('file:send', async () => {
+    const serverUrl = store.get('serverUrl');
+    const token = store.get('accessToken');
+    const result = await dialog.showOpenDialog({
+      title: '파일 선택 (최대 5MB)',
+      properties: ['openFile'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return { ok: false };
+    const filePath = result.filePaths[0]!;
+    const stat = fs.statSync(filePath);
+    if (stat.size > 5 * 1024 * 1024) {
+      return { ok: false, error: '파일 크기가 5MB를 초과합니다.' };
+    }
+    try {
+      const form = new FormData();
+      form.append('file', fs.createReadStream(filePath), path.basename(filePath));
+      const { data } = await axios.post(`${serverUrl}/files/send`, form, {
+        headers: { ...form.getHeaders(), Authorization: `Bearer ${token}` },
+      });
+      return { ok: true, ...data };
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? '파일 전송 실패';
+      return { ok: false, error: message };
+    }
+  });
+
+  // ── File: download ──────────────────────────────────────────────────────────
+  ipcMain.handle('file:download', async (_event, { fileUrl, fileName }: { fileUrl: string; fileName: string }) => {
+    const token = store.get('accessToken');
+    const result = await dialog.showSaveDialog({
+      defaultPath: fileName,
+      title: '파일 저장',
+    });
+    if (result.canceled || !result.filePath) return { ok: false };
+    try {
+      const { data } = await axios.get(fileUrl, {
+        responseType: 'arraybuffer',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fs.writeFileSync(result.filePath, Buffer.from(data as ArrayBuffer));
+      shell.showItemInFolder(result.filePath);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: '다운로드 실패' };
     }
   });
 

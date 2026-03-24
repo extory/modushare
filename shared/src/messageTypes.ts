@@ -53,7 +53,17 @@ export type WSMessageType =
   | 'SHARE_INVITATION'
   | 'SHARE_ACCEPTED'
   | 'CLIENT_HELLO'
-  | 'VERSION_MISMATCH';
+  | 'VERSION_MISMATCH'
+  | 'FILE_TRANSFER';
+
+export interface FileTransferPayload {
+  transferId: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  fileUrl: string;
+  senderEmail: string;
+}
 
 // ─── Generic envelope ────────────────────────────────────────────────────────
 

@@ -284,6 +284,20 @@ export class WSClient extends EventEmitter {
         break;
       }
 
+      case 'FILE_TRANSFER': {
+        const ft = msg.payload as {
+          transferId?: string; fileName?: string; fileSize?: number; mimeType?: string; fileUrl?: string; senderEmail?: string;
+        };
+        const { BrowserWindow } = require('electron');
+        BrowserWindow.getAllWindows().forEach((win: Electron.BrowserWindow) => {
+          if (!win.isDestroyed()) {
+            win.webContents.send('file:incoming', ft);
+          }
+        });
+        this.emit('fileTransfer', ft);
+        break;
+      }
+
       default:
         break;
     }

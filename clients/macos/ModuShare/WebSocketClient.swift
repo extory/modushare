@@ -26,6 +26,13 @@ struct WSPayload: Codable {
     var myVersion: String?
     var peerVersion: String?
     var downloadUrl: String?
+    // FILE_TRANSFER
+    var transferId: String?
+    var fileName: String?
+    var fileSize: Int?
+    var mimeType: String?
+    var fileUrl: String?
+    var senderEmail: String?
 }
 
 // MARK: – Delegate

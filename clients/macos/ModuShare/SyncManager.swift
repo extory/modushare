@@ -312,6 +312,13 @@ extension SyncManager: WebSocketClientDelegate {
                 }
             }
 
+        case "FILE_TRANSFER":
+            if let payload = message.payload {
+                DispatchQueue.main.async {
+                    self.showFileTransferNotification(payload: payload)
+                }
+            }
+
         default:
             break
         }
@@ -396,6 +403,35 @@ extension SyncManager: WebSocketClientDelegate {
         }
     }
 
+    // MARK: – File transfer notification
+
+    private func showFileTransferNotification(payload: WSPayload) {
+        let fileName = payload.fileName ?? "파일"
+        let senderEmail = payload.senderEmail ?? "상대방"
+        let fileUrl = payload.fileUrl ?? ""
+        let fileSizeKB = ((payload.fileSize ?? 0) / 1024)
+
+        let content = UNMutableNotificationContent()
+        content.title = "ModuShare – 파일 수신"
+        content.body = "\(senderEmail)이(가) \"\(fileName)\" (\(fileSizeKB)KB)을 보냈습니다."
+        content.sound = .default
+        content.userInfo = ["fileUrl": fileUrl, "fileName": fileName]
+
+        let action = UNNotificationAction(identifier: "SAVE_FILE", title: "저장", options: .foreground)
+        let category = UNNotificationCategory(identifier: "FILE_TRANSFER", actions: [action], intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([category])
+        content.categoryIdentifier = "FILE_TRANSFER"
+
+        let request = UNNotificationRequest(identifier: "modushare.file.\(UUID().uuidString)", content: content, trigger: nil)
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            UNUserNotificationCenter.current().add(request)
+        }
+
+        // Also post to NotificationCenter so AppDelegate can show save panel
+        NotificationCenter.default.post(name: .fileTransferReceived, object: ["fileUrl": fileUrl, "fileName": fileName])
+    }
+
     // MARK: – Toast notification
 
     private func showSharingToast(deviceCount: Int) {
@@ -424,7 +460,8 @@ extension SyncManager: WebSocketClientDelegate {
 // MARK: – Notification names
 
 extension Notification.Name {
-    static let syncStatusChanged = Notification.Name("com.modushare.syncStatusChanged")
-    static let menuBarFlash      = Notification.Name("com.modushare.menuBarFlash")
-    static let versionMismatch   = Notification.Name("com.modushare.versionMismatch")
+    static let syncStatusChanged  = Notification.Name("com.modushare.syncStatusChanged")
+    static let menuBarFlash       = Notification.Name("com.modushare.menuBarFlash")
+    static let versionMismatch    = Notification.Name("com.modushare.versionMismatch")
+    static let fileTransferReceived = Notification.Name("com.modushare.fileTransferReceived")
 }

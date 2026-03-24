@@ -1,6 +1,6 @@
 import { IncomingMessage, Server } from 'http';
 import WebSocket, { WebSocketServer } from 'ws';
-import { WSMessage, ClipboardUpdatePayload, ClientHelloPayload, VersionMismatchPayload } from '@modushare/shared';
+import { WSMessage, ClipboardUpdatePayload, ClientHelloPayload, VersionMismatchPayload, FileTransferPayload } from '@modushare/shared';
 import { authService } from '../services/authService';
 import { userSessions } from './userSessions';
 import { handleClipboardUpdate, handleSyncToggle } from './handlers';

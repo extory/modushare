@@ -41,6 +41,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: .updateAvailable,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(fileTransferReceived(_:)),
+            name: .fileTransferReceived,
+            object: nil
+        )
 
         // Start periodic update checks
         AutoUpdater.shared.startPeriodicChecks()
@@ -96,6 +102,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if AuthManager.shared.isAuthenticated {
+            menu.addItem(withTitle: "파일 보내기…", action: #selector(sendFile), keyEquivalent: "")
             menu.addItem(withTitle: "공유 관리…", action: #selector(showSharePreferences), keyEquivalent: "")
         }
 
@@ -141,6 +148,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: – Notification handlers
+
+    @objc private func fileTransferReceived(_ notification: Notification) {
+        guard let info = notification.object as? [String: String],
+              let fileUrl = info["fileUrl"], !fileUrl.isEmpty,
+              let fileName = info["fileName"] else { return }
+        Task {
+            await MainActor.run {
+                let panel = NSSavePanel()
+                panel.nameFieldStringValue = fileName
+                panel.title = "파일 저장"
+                panel.begin { response in
+                    guard response == .OK, let saveUrl = panel.url else { return }
+                    Task {
+                        guard let token = AuthManager.shared.accessToken,
+                              let url = URL(string: fileUrl) else { return }
+                        var req = URLRequest(url: url)
+                        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        do {
+                            let (data, _) = try await URLSession.shared.data(for: req)
+                            try data.write(to: saveUrl)
+                            NSWorkspace.shared.activateFileViewerSelecting([saveUrl])
+                        } catch {
+                            await MainActor.run {
+                                let alert = NSAlert()
+                                alert.messageText = "다운로드 실패"
+                                alert.informativeText = error.localizedDescription
+                                alert.runModal()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     @objc private func syncStatusDidChange() {
         updateMenu()
@@ -228,6 +269,83 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             await AuthManager.shared.logout()
             syncManager.stop()
             await MainActor.run { self.updateMenu() }
+        }
+    }
+
+    @objc private func sendFile() {
+        let panel = NSOpenPanel()
+        panel.title = "파일 선택 (최대 5MB)"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+            let fileSize = attrs?[.size] as? Int ?? 0
+            if fileSize > 5 * 1024 * 1024 {
+                DispatchQueue.main.async {
+                    let alert = NSAlert()
+                    alert.messageText = "파일 크기 초과"
+                    alert.informativeText = "5MB 이하의 파일만 전송할 수 있습니다."
+                    alert.runModal()
+                }
+                return
+            }
+            Task { await self?.uploadAndSendFile(url: url, fileSize: fileSize) }
+        }
+    }
+
+    private func uploadAndSendFile(url: URL, fileSize: Int) async {
+        guard let token = AuthManager.shared.accessToken,
+              let serverURL = URL(string: "\(AuthManager.shared.serverURL)/files/send") else { return }
+
+        var request = URLRequest(url: serverURL)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        guard let fileData = try? Data(contentsOf: url) else { return }
+        let fileName = url.lastPathComponent
+        let mimeType = url.mimeType
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            await MainActor.run {
+                if statusCode == 201 {
+                    let content = UNMutableNotificationContent()
+                    content.title = "ModuShare"
+                    content.body = "\"\(fileName)\" 파일을 전송했습니다."
+                    content.sound = .default
+                    let req = UNNotificationRequest(identifier: "modushare.filesent", content: content, trigger: nil)
+                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                        guard granted else { return }
+                        UNUserNotificationCenter.current().add(req)
+                    }
+                } else {
+                    let alert = NSAlert()
+                    alert.messageText = "전송 실패"
+                    alert.informativeText = "파일 전송에 실패했습니다."
+                    alert.runModal()
+                }
+            }
+        } catch {
+            await MainActor.run {
+                let alert = NSAlert()
+                alert.messageText = "전송 실패"
+                alert.informativeText = error.localizedDescription
+                alert.runModal()
+            }
         }
     }
 

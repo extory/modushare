@@ -13,6 +13,7 @@ import clipboardRouter from './routes/clipboard';
 import uploadRouter from './routes/upload';
 import shareRouter from './routes/share';
 import adminRouter from './routes/admin';
+import filesRouter from './routes/files';
 import { attachWebSocketServer } from './websocket/wsServer';
 import { authService } from './services/authService';
 import { clipboardService } from './services/clipboardService';
@@ -47,6 +48,7 @@ app.use('/clipboard', clipboardRouter);
 app.use('/upload', uploadRouter);
 app.use('/share', shareRouter);
 app.use('/admin', adminRouter);
+app.use('/files', filesRouter);
 
 // Serve uploaded files (auth is enforced inside the upload router)
 app.use('/uploads', express.static(config.UPLOAD_DIR));

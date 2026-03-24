@@ -1,5 +1,8 @@
-import { Tray, Menu, shell, app, nativeImage } from 'electron';
+import { Tray, Menu, shell, app, nativeImage, dialog } from 'electron';
 import path from 'path';
+import fs from 'fs';
+import FormData from 'form-data';
+import axios from 'axios';
 import Store from 'electron-store';
 import { AppStore, openLoginWindow } from './main';
 import { WSClient } from './wsClient';
@@ -49,6 +52,25 @@ export function createTray(
   // WSClient에서 신규 원격 복사 이벤트 수신
   wsClient.on('remoteClipboard', () => {
     startFlash();
+  });
+
+  wsClient.on('fileTransfer', (ft: { fileName?: string; fileSize?: number; fileUrl?: string; senderEmail?: string }) => {
+    const sizeKB = ft.fileSize ? Math.round(ft.fileSize / 1024) : 0;
+    tray.displayBalloon({
+      title: 'ModuShare – 파일 수신',
+      content: `${ft.senderEmail ?? '상대방'}이(가) "${ft.fileName ?? '파일'}" (${sizeKB}KB)을 보냈습니다. 클릭하여 저장`,
+      iconType: 'info',
+    });
+    tray.once('balloon-click', async () => {
+      if (!ft.fileUrl || !ft.fileName) return;
+      const { ipcMain } = require('electron');
+      // Send download request via IPC to main process handler
+      const { BrowserWindow } = require('electron');
+      const wins = BrowserWindow.getAllWindows();
+      if (wins.length > 0) {
+        wins[0].webContents.send('file:download-request', { fileUrl: ft.fileUrl, fileName: ft.fileName });
+      }
+    });
   });
 
   wsClient.on('quotaExceeded', () => {
@@ -114,6 +136,10 @@ export function createTray(
         },
       },
       {
+        label: '파일 보내기…',
+        click: () => sendFile(store),
+      },
+      {
         label: '공유 관리…',
         click: () => openShareWindow(),
       },
@@ -174,6 +200,28 @@ export function createTray(
   });
 
   return tray;
+}
+
+async function sendFile(store: Store<AppStore>): Promise<void> {
+  const serverUrl = store.get('serverUrl');
+  const token = store.get('accessToken');
+  const result = await dialog.showOpenDialog({ title: '파일 선택 (최대 5MB)', properties: ['openFile'] });
+  if (result.canceled || result.filePaths.length === 0) return;
+  const filePath = result.filePaths[0]!;
+  const stat = fs.statSync(filePath);
+  if (stat.size > 5 * 1024 * 1024) {
+    dialog.showErrorBox('파일 크기 초과', '5MB 이하의 파일만 전송할 수 있습니다.');
+    return;
+  }
+  try {
+    const form = new FormData();
+    form.append('file', fs.createReadStream(filePath), path.basename(filePath));
+    await axios.post(`${serverUrl}/files/send`, form, {
+      headers: { ...form.getHeaders(), Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    dialog.showErrorBox('전송 실패', '파일 전송에 실패했습니다.');
+  }
 }
 
 function openShareWindow(): void {
