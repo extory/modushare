@@ -80,8 +80,10 @@ export class ClipboardPoller extends EventEmitter {
     // ── Image changed ─────────────────────────────────────────────────────────
     if (!img.isEmpty() && currentImageHash !== this.lastImageHash) {
       this.lastImageHash = currentImageHash;
-      if (currentImageHash === this.lastReceivedHash) return; // echo prevention
-      this.lastReceivedHash = '';
+      if (currentImageHash === this.lastReceivedHash) {
+        this.lastReceivedHash = '';
+        return; // echo prevention
+      }
 
       const pngBuffer = img.toPNG();
       const base64 = pngBuffer.toString('base64');

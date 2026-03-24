@@ -192,16 +192,25 @@ export class WSClient extends EventEmitter {
             const fullUrl = payload.imageUrl.startsWith('http')
               ? payload.imageUrl
               : `${serverUrl}${payload.imageUrl}`;
+            console.log('[ws] Downloading image from:', fullUrl);
             axios.get(fullUrl, {
               responseType: 'arraybuffer',
               headers: { Authorization: `Bearer ${token}` },
             }).then((res) => {
               const buf = Buffer.from(res.data as ArrayBuffer);
-              const hash = crypto.createHash('sha256').update(buf).digest('hex');
-              if (this.poller) this.poller.lastReceivedHash = hash;
+              console.log('[ws] Image downloaded, size:', buf.length, 'bytes');
               const img = nativeImage.createFromBuffer(buf);
+              console.log('[ws] nativeImage empty?', img.isEmpty(), 'size:', img.getSize());
+              if (img.isEmpty()) {
+                console.error('[ws] nativeImage is empty, clipboard write skipped');
+                return;
+              }
+              const pngBuf = img.toPNG();
+              const hash = crypto.createHash('sha256').update(pngBuf).digest('hex');
+              if (this.poller) this.poller.lastReceivedHash = hash;
               clipboard.writeImage(img);
               this.emit('remoteClipboard');
+              console.log('[ws] Image written to clipboard');
             }).catch((err) => {
               console.error('[ws] Failed to download image:', err.message);
             });
