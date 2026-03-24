@@ -128,11 +128,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "지금 업데이트 확인", action: #selector(checkForUpdateNow), keyEquivalent: "")
 
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit ModuShare", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         for item in menu.items {
             item.target = self
         }
+
+        let quitItem = NSMenuItem(title: "Quit ModuShare", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quitItem.target = NSApp
+        menu.addItem(quitItem)
 
         self.statusItem.menu = menu
     }
