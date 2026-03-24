@@ -6,8 +6,8 @@ import { imageService } from '../services/imageService';
 import { userSessions } from './userSessions';
 import { config } from '../config';
 
-// ~512 KB expressed as a base64 character count (4/3 ratio)
-const MAX_INLINE_BASE64_CHARS = Math.ceil((512 * 1024 * 4) / 3);
+// ~5 MB expressed as a base64 character count (4/3 ratio)
+const MAX_INLINE_BASE64_CHARS = Math.ceil((5 * 1024 * 1024 * 4) / 3);
 
 export async function handleClipboardUpdate(
   userId: string,
@@ -44,7 +44,7 @@ export async function handleClipboardUpdate(
         sendError(
           senderWs,
           'IMAGE_TOO_LARGE',
-          'Image exceeds 512 KB inline limit. Upload via /upload/image first.'
+          'Image exceeds 5 MB inline limit. Upload via /upload/image first.'
         );
         return;
       }

@@ -3,8 +3,8 @@ import Cocoa
 import CryptoKit
 import UserNotifications
 
-// 512 KB limit for inline image transfer
-private let maxInlineImageBytes = 512 * 1024
+// 5 MB limit for inline image transfer
+private let maxInlineImageBytes = 5 * 1024 * 1024
 private let clientVersion = "1.0.0"
 private let clientPlatform = "macos"
 private let downloadUrl = "https://github.com/extory/modushare/releases/latest"

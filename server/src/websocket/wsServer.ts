@@ -21,7 +21,7 @@ function compareSemver(a: string, b: string): number {
 const PING_INTERVAL_MS = 30_000;
 
 export function attachWebSocketServer(httpServer: Server): WebSocketServer {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 10 * 1024 * 1024 }); // 10 MB
 
   // Handle HTTP upgrade
   httpServer.on('upgrade', (req: IncomingMessage, socket, head) => {

@@ -7,7 +7,7 @@ import Store from 'electron-store';
 import { AppStore } from './main';
 import { ClipboardChangedEvent } from './clipboardPoller';
 
-const MAX_INLINE_BYTES = 512 * 1024; // 512 KB
+const MAX_INLINE_BYTES = 5 * 1024 * 1024; // 5 MB
 const INITIAL_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
 const CLIENT_VERSION = '1.2.0';
