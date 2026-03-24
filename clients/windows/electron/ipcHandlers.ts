@@ -128,7 +128,7 @@ export function setupIpcHandlers(
 
           // 5. code → ID token (서버에 code + redirectUri 전달)
           try {
-            const { data } = await axios.post<{ accessToken: string; user: LoginResponse['user'] }>(
+            const { data } = await axios.post<LoginResponse>(
               `${serverUrl}/auth/google`,
               { code, redirectUri }
             );
