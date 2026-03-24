@@ -21,8 +21,8 @@ function hashBuffer(buf: Buffer): string {
 export class ClipboardPoller extends EventEmitter {
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastText = '';
-  // Set by WSClient when it writes to clipboard to prevent echo
-  public lastImageHash = '';
+  private lastImageHash = '';
+  // Set by WSClient when a remote clipboard is written locally — cleared after one echo check
   public lastReceivedHash = '';
 
   constructor(
@@ -37,9 +37,7 @@ export class ClipboardPoller extends EventEmitter {
     // Seed current state so first poll doesn't fire spuriously
     this.lastText = clipboard.readText();
     const img = clipboard.readImage();
-    this.lastImageHash = img.isEmpty()
-      ? ''
-      : hashBuffer(img.toPNG());
+    this.lastImageHash = img.isEmpty() ? '' : hashBuffer(img.toPNG());
 
     this.timer = setInterval(() => this.poll(), POLL_INTERVAL_MS);
   }
@@ -61,28 +59,34 @@ export class ClipboardPoller extends EventEmitter {
     if (currentText && currentText !== this.lastText) {
       this.lastText = currentText;
       const textHash = hashBuffer(Buffer.from(currentText, 'utf-8'));
-      if (textHash === this.lastReceivedHash) return; // echo prevention
+      if (textHash === this.lastReceivedHash) {
+        this.lastReceivedHash = '';
+        return; // echo prevention — clear immediately after one check
+      }
       this.lastReceivedHash = '';
 
-      // Auto-reconnect if disconnected
       if (!this.wsClient.isConnected()) {
         this.wsClient.reconnectNow();
         return;
       }
 
-      this.wsClient.sendClipboardUpdate({
-        type: 'text',
-        text: currentText,
-      });
+      this.wsClient.sendClipboardUpdate({ type: 'text', text: currentText });
       return;
     }
 
     // ── Image changed ─────────────────────────────────────────────────────────
     if (!img.isEmpty() && currentImageHash !== this.lastImageHash) {
       this.lastImageHash = currentImageHash;
+
       if (currentImageHash === this.lastReceivedHash) {
-        this.lastReceivedHash = '';
+        this.lastReceivedHash = ''; // clear immediately — next different image will be sent
         return; // echo prevention
+      }
+      this.lastReceivedHash = '';
+
+      if (!this.wsClient.isConnected()) {
+        this.wsClient.reconnectNow();
+        return;
       }
 
       const pngBuffer = img.toPNG();
