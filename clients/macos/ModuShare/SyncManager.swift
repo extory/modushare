@@ -274,15 +274,21 @@ extension SyncManager: WebSocketClientDelegate {
         case "CLIPBOARD_UPDATE":
             if let payload = message.payload {
                 applyRemoteClipboardUpdate(payload)
+                let typeLabel = payload.contentType == "image" ? "이미지" : "텍스트"
+                let sender = payload.senderEmail ?? "상대방"
+                DispatchQueue.main.async {
+                    self.showCopiedToast(sender: sender, typeLabel: typeLabel)
+                }
             }
             // 다른 기기에서 복사한 내역 → 메뉴바 아이콘 이펙트
             DispatchQueue.main.async { self.startMenuBarFlash() }
 
         case "ERROR":
             if message.payload?.code == "QUOTA_EXCEEDED" {
-                DispatchQueue.main.async {
-                    self.showQuotaExceededNotification()
-                }
+                DispatchQueue.main.async { self.showQuotaExceededNotification() }
+            } else if message.payload?.code == "TOO_LARGE" {
+                let msg = message.payload?.message ?? "최대 5MB까지 전송할 수 있습니다."
+                DispatchQueue.main.async { self.showErrorToast(message: msg) }
             }
 
         case "CLIPBOARD_ACK":
@@ -433,6 +439,30 @@ extension SyncManager: WebSocketClientDelegate {
     }
 
     // MARK: – Toast notification
+
+    private func showCopiedToast(sender: String, typeLabel: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "ModuShare"
+        content.body = "\(sender) copied (\(typeLabel))"
+        content.sound = .default
+        let request = UNNotificationRequest(identifier: "modushare.copied.\(UUID().uuidString)", content: content, trigger: nil)
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            UNUserNotificationCenter.current().add(request)
+        }
+    }
+
+    private func showErrorToast(message: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "ModuShare – 오류"
+        content.body = message
+        content.sound = .default
+        let request = UNNotificationRequest(identifier: "modushare.error.\(UUID().uuidString)", content: content, trigger: nil)
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            UNUserNotificationCenter.current().add(request)
+        }
+    }
 
     private func showSharingToast(deviceCount: Int) {
         let content = UNMutableNotificationContent()

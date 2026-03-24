@@ -17,6 +17,9 @@ export async function handleClipboardUpdate(
 ): Promise<void> {
   console.log(`[clipboard] UPDATE from userId=${userId} type=${payload.contentType}`);
 
+  const senderRow = db.prepare<string[], { email: string }>('SELECT email FROM users WHERE id = ?').get(userId);
+  const senderEmail = senderRow?.email ?? '';
+
   if (!userSessions.getSyncEnabled(userId)) {
     console.log(`[clipboard] sync disabled for userId=${userId}`);
     sendError(senderWs, 'SYNC_DISABLED', 'Sync is currently disabled');
@@ -33,7 +36,7 @@ export async function handleClipboardUpdate(
     }
     const maxBytes = config.MAX_CLIPBOARD_SIZE_MB * 1024 * 1024;
     if (Buffer.byteLength(payload.content, 'utf8') > maxBytes) {
-      sendError(senderWs, 'TOO_LARGE', 'Text content exceeds size limit');
+      sendError(senderWs, 'TOO_LARGE', `텍스트가 ${config.MAX_CLIPBOARD_SIZE_MB}MB를 초과합니다.`);
       return;
     }
     contentText = payload.content;
@@ -41,11 +44,7 @@ export async function handleClipboardUpdate(
     if (payload.imageData) {
       // Inline base64 image – reject if too large
       if (payload.imageData.length > MAX_INLINE_BASE64_CHARS) {
-        sendError(
-          senderWs,
-          'IMAGE_TOO_LARGE',
-          'Image exceeds 5 MB inline limit. Upload via /upload/image first.'
-        );
+        sendError(senderWs, 'TOO_LARGE', '이미지가 5MB를 초과합니다.');
         return;
       }
       // Save base64 to disk
@@ -85,9 +84,10 @@ export async function handleClipboardUpdate(
   const item = result;
 
   // Build broadcast payload (don't re-send large base64 blobs)
-  const broadcastPayload: ClipboardUpdatePayload & { itemId: string } = {
+  const broadcastPayload: ClipboardUpdatePayload & { itemId: string; senderEmail: string } = {
     contentType: payload.contentType,
     itemId: item.id,
+    senderEmail,
     ...(contentText !== null ? { content: contentText } : {}),
     ...(imagePath ? { imageUrl: `/uploads/${imagePath}` } : {}),
   };

@@ -50,8 +50,23 @@ export function createTray(
   }
 
   // WSClient에서 신규 원격 복사 이벤트 수신
-  wsClient.on('remoteClipboard', () => {
+  wsClient.on('remoteClipboard', (info: { contentType?: string; senderEmail?: string }) => {
     startFlash();
+    const typeLabel = info?.contentType === 'image' ? '이미지' : '텍스트';
+    const sender = info?.senderEmail ?? '상대방';
+    tray.displayBalloon({
+      title: 'ModuShare',
+      content: `${sender} copied (${typeLabel})`,
+      iconType: 'info',
+    });
+  });
+
+  wsClient.on('tooLarge', (message: string) => {
+    tray.displayBalloon({
+      title: 'ModuShare – 크기 초과',
+      content: message,
+      iconType: 'warning',
+    });
   });
 
   wsClient.on('fileTransfer', (ft: { fileName?: string; fileSize?: number; fileUrl?: string; senderEmail?: string }) => {

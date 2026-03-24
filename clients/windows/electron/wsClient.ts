@@ -168,6 +168,7 @@ export class WSClient extends EventEmitter {
           content?: string;
           imageData?: string;
           imageUrl?: string;
+          senderEmail?: string;
         };
         if (payload.contentType === 'text' && payload.content) {
           const hash = crypto
@@ -176,7 +177,7 @@ export class WSClient extends EventEmitter {
             .digest('hex');
           if (this.poller) this.poller.lastReceivedHash = hash;
           clipboard.writeText(payload.content);
-          this.emit('remoteClipboard');
+          this.emit('remoteClipboard', { contentType: 'text', senderEmail: payload.senderEmail });
         } else if (payload.contentType === 'image') {
           if (payload.imageData) {
             const buf = Buffer.from(payload.imageData, 'base64');
@@ -185,7 +186,7 @@ export class WSClient extends EventEmitter {
             const hash = crypto.createHash('sha256').update(pngBuf).digest('hex');
             if (this.poller) this.poller.lastReceivedHash = hash;
             clipboard.writeImage(img);
-            this.emit('remoteClipboard');
+            this.emit('remoteClipboard', { contentType: 'image', senderEmail: payload.senderEmail });
           } else if (payload.imageUrl) {
             // Download image from server and write to clipboard
             const serverUrl = this.store.get('serverUrl');
@@ -209,7 +210,7 @@ export class WSClient extends EventEmitter {
               const hash = crypto.createHash('sha256').update(pngBuf).digest('hex');
               if (this.poller) this.poller.lastReceivedHash = hash;
               clipboard.writeImage(img);
-              this.emit('remoteClipboard');
+              this.emit('remoteClipboard', { contentType: 'image', senderEmail: payload.senderEmail });
               console.log('[ws] Image written to clipboard');
             }).catch((err) => {
               console.error('[ws] Failed to download image:', err.message);
@@ -220,9 +221,11 @@ export class WSClient extends EventEmitter {
       }
 
       case 'ERROR': {
-        const errPayload = msg.payload as { code?: string };
+        const errPayload = msg.payload as { code?: string; message?: string };
         if (errPayload?.code === 'QUOTA_EXCEEDED') {
           this.emit('quotaExceeded');
+        } else if (errPayload?.code === 'TOO_LARGE') {
+          this.emit('tooLarge', errPayload.message ?? '최대 5MB까지 전송할 수 있습니다.');
         }
         break;
       }
