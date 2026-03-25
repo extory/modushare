@@ -1,6 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
 import db from '../db';
 import { ClipboardItem } from '@modushare/shared';
+import { config } from '../config';
 
 const AGING_OUT_MS = 10 * 60 * 1000;      // 10분
 const QUOTA_BYTES  = 20 * 1024 * 1024;    // 20 MB per user
@@ -118,9 +121,19 @@ export const clipboardService = {
   /** 10분 이상 된 항목 삭제 (서버 시작 시 + 주기적으로 호출) */
   pruneAgedItems(): void {
     const cutoff = Date.now() - AGING_OUT_MS;
-    db.prepare(
-      `DELETE FROM clipboard_items WHERE created_at < ?`
-    ).run(cutoff);
+    const expired = db.prepare<[number], { image_path: string | null }>(
+      `SELECT image_path FROM clipboard_items WHERE created_at < ?`
+    ).all(cutoff);
+
+    // Delete image files from disk
+    for (const row of expired) {
+      if (row.image_path) {
+        const absPath = path.join(config.UPLOAD_DIR, row.image_path);
+        try { fs.unlinkSync(absPath); } catch { /* already gone */ }
+      }
+    }
+
+    db.prepare(`DELETE FROM clipboard_items WHERE created_at < ?`).run(cutoff);
   },
 
   /** 현재 사용량 반환 (bytes) */
