@@ -28,6 +28,9 @@ export async function handleClipboardUpdate(
 
   let contentText: string | null = null;
   let imagePath: string | null = null;
+  let filePath: string | null = null;
+  let fileName: string | null = null;
+  let fileSize: number | null = null;
 
   if (payload.contentType === 'text') {
     if (!payload.content) {
@@ -63,6 +66,15 @@ export async function handleClipboardUpdate(
       sendError(senderWs, 'INVALID_PAYLOAD', 'Image data or URL is required');
       return;
     }
+  } else if (payload.contentType === 'file') {
+    if (!payload.fileUrl) {
+      sendError(senderWs, 'INVALID_PAYLOAD', 'File URL is required');
+      return;
+    }
+    const match = payload.fileUrl.match(/\/uploads\/(.+)$/);
+    filePath = match ? match[1]! : null;
+    fileName = payload.fileName ?? null;
+    fileSize = payload.fileSize ?? null;
   } else {
     sendError(senderWs, 'INVALID_CONTENT_TYPE', 'Unknown content type');
     return;
@@ -73,7 +85,10 @@ export async function handleClipboardUpdate(
     deviceId,
     payload.contentType,
     contentText,
-    imagePath
+    imagePath,
+    filePath,
+    fileName,
+    fileSize,
   );
 
   if (result === 'QUOTA_EXCEEDED') {
@@ -90,6 +105,7 @@ export async function handleClipboardUpdate(
     senderEmail,
     ...(contentText !== null ? { content: contentText } : {}),
     ...(imagePath ? { imageUrl: `/uploads/${imagePath}` } : {}),
+    ...(filePath ? { fileUrl: `/uploads/${filePath}`, fileName: fileName ?? undefined, fileSize: fileSize ?? undefined } : {}),
   };
 
   const message: WSMessage<typeof broadcastPayload> = {

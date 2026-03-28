@@ -10,6 +10,12 @@ export interface ClipboardUpdatePayload {
   imageData?: string;
   /** URL returned by the upload endpoint (images >= 512 KB) */
   imageUrl?: string;
+  /** File URL (when contentType === 'file') */
+  fileUrl?: string;
+  /** Original file name */
+  fileName?: string;
+  /** File size in bytes */
+  fileSize?: number;
   /** Populated by server on broadcast so clients can cache the DB id */
   itemId?: string;
 }

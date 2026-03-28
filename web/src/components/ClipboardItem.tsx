@@ -40,6 +40,12 @@ export function ClipboardItemCard({ item }: ClipboardItemProps) {
     }
   };
 
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   const handleDelete = async () => {
     setDeleting(true);
     try {
@@ -58,9 +64,9 @@ export function ClipboardItemCard({ item }: ClipboardItemProps) {
     <div style={styles.card}>
       <div style={styles.header}>
         <span style={styles.badge}>
-          {item.contentType === 'text' ? '&#128196;' : '&#128247;'}
+          {item.contentType === 'text' ? '📄' : item.contentType === 'image' ? '🖼' : '📎'}
           {' '}
-          {item.contentType === 'text' ? 'Text' : 'Image'}
+          {item.contentType === 'text' ? 'Text' : item.contentType === 'image' ? 'Image' : 'File'}
         </span>
         <span style={styles.device}>{item.deviceId.slice(0, 8)}</span>
         <span style={styles.time}>{formatTime(item.createdAt)}</span>
@@ -93,6 +99,19 @@ export function ClipboardItemCard({ item }: ClipboardItemProps) {
         )}
         {item.contentType === 'image' && item.imageUrl && (
           <ImagePreview src={item.imageUrl} />
+        )}
+        {item.contentType === 'file' && item.fileUrl && (
+          <div style={styles.fileCard}>
+            <span style={styles.fileIcon}>📎</span>
+            <div style={styles.fileMeta}>
+              <a href={item.fileUrl} download={item.fileName} style={styles.fileLink}>
+                {item.fileName ?? 'Download file'}
+              </a>
+              {item.fileSize != null && (
+                <span style={styles.fileSize}>{formatBytes(item.fileSize)}</span>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -154,6 +173,23 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#ef4444',
   },
   content: { overflow: 'hidden' },
+  fileCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.5rem',
+    background: '#f5f5f7',
+    borderRadius: 8,
+  },
+  fileIcon: { fontSize: '1.25rem' },
+  fileMeta: { display: 'flex', flexDirection: 'column' as const, gap: 2 },
+  fileLink: {
+    fontSize: '0.875rem',
+    color: '#6366f1',
+    fontWeight: 500,
+    textDecoration: 'none',
+  },
+  fileSize: { fontSize: '0.75rem', color: '#aaa' },
   text: {
     fontSize: '0.875rem',
     lineHeight: 1.6,

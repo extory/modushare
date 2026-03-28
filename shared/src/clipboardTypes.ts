@@ -1,4 +1,4 @@
-export type ClipboardContentType = 'text' | 'image';
+export type ClipboardContentType = 'text' | 'image' | 'file';
 
 export interface ClipboardTextContent {
   contentType: 'text';
@@ -13,7 +13,14 @@ export interface ClipboardImageContent {
   imageUrl?: string;
 }
 
-export type ClipboardContent = ClipboardTextContent | ClipboardImageContent;
+export interface ClipboardFileContent {
+  contentType: 'file';
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+}
+
+export type ClipboardContent = ClipboardTextContent | ClipboardImageContent | ClipboardFileContent;
 
 export interface ClipboardItem {
   id: string;
@@ -22,6 +29,9 @@ export interface ClipboardItem {
   contentType: ClipboardContentType;
   contentText?: string;
   imagePath?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
   createdAt: number; // Unix ms timestamp
   isDeleted: boolean;
 }

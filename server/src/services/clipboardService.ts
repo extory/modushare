@@ -15,6 +15,9 @@ interface ClipboardRow {
   content_type: string;
   content_text: string | null;
   image_path: string | null;
+  file_path: string | null;
+  file_name: string | null;
+  file_size: number | null;
   created_at: number;
   is_deleted: number;
 }
@@ -24,9 +27,12 @@ function rowToItem(row: ClipboardRow): ClipboardItem {
     id: row.id,
     userId: row.user_id,
     deviceId: row.device_id,
-    contentType: row.content_type as 'text' | 'image',
+    contentType: row.content_type as 'text' | 'image' | 'file',
     contentText: row.content_text ?? undefined,
     imagePath: row.image_path ?? undefined,
+    fileUrl: row.file_path ? `/uploads/${row.file_path}` : undefined,
+    fileName: row.file_name ?? undefined,
+    fileSize: row.file_size ?? undefined,
     createdAt: row.created_at,
     isDeleted: row.is_deleted === 1,
   };
@@ -40,12 +46,15 @@ export const clipboardService = {
   saveClipboardItem(
     userId: string,
     deviceId: string,
-    contentType: 'text' | 'image',
+    contentType: 'text' | 'image' | 'file',
     content: string | null,
-    imagePath: string | null
+    imagePath: string | null,
+    filePath: string | null = null,
+    fileName: string | null = null,
+    fileSize: number | null = null,
   ): ClipboardItem | 'QUOTA_EXCEEDED' {
     // ── 용량 계산 ──────────────────────────────────────────────────────────
-    const incomingBytes = content ? Buffer.byteLength(content, 'utf8') : 0;
+    const incomingBytes = content ? Buffer.byteLength(content, 'utf8') : (fileSize ?? 0);
 
     const usageRow = db
       .prepare<[string], { total: number }>(
@@ -66,9 +75,9 @@ export const clipboardService = {
 
     db.prepare(
       `INSERT INTO clipboard_items
-         (id, user_id, device_id, content_type, content_text, image_path, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, userId, deviceId, contentType, content, imagePath, now);
+         (id, user_id, device_id, content_type, content_text, image_path, file_path, file_name, file_size, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, userId, deviceId, contentType, content, imagePath, filePath, fileName, fileSize, now);
 
     return {
       id,
@@ -77,6 +86,9 @@ export const clipboardService = {
       contentType,
       contentText: content ?? undefined,
       imagePath: imagePath ?? undefined,
+      fileUrl: filePath ? `/uploads/${filePath}` : undefined,
+      fileName: fileName ?? undefined,
+      fileSize: fileSize ?? undefined,
       createdAt: now,
       isDeleted: false,
     };

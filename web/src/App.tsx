@@ -86,6 +86,7 @@ export default function App() {
         case 'CLIPBOARD_UPDATE': {
           const payload = msg.payload as ClipboardUpdatePayload & {
             itemId?: string;
+            senderEmail?: string;
           };
           const newItem: ClipboardItem = {
             id: payload.itemId ?? uuidv4(),
@@ -94,16 +95,28 @@ export default function App() {
             contentType: payload.contentType,
             contentText: payload.content,
             imageUrl: payload.imageUrl,
+            fileUrl: payload.fileUrl,
+            fileName: payload.fileName,
+            fileSize: payload.fileSize,
             createdAt: msg.timestamp,
             isDeleted: false,
           };
           addItem(newItem);
+          // Show toast when a partner copies something (not our own device)
+          if (payload.senderEmail && payload.senderEmail !== user?.email) {
+            const typeLabel = payload.contentType === 'image' ? 'image'
+              : payload.contentType === 'file' ? 'file'
+              : 'text';
+            showToast(`${payload.senderEmail} copied ${typeLabel}`);
+          }
           break;
         }
         case 'ERROR': {
           const errPayload = msg.payload as { code?: string; message?: string };
           if (errPayload?.code === 'QUOTA_EXCEEDED') {
             showToast('⚠️ ' + (errPayload.message ?? '저장 용량(20MB)을 초과했습니다.'));
+          } else if (errPayload?.code === 'IMAGE_TOO_LARGE' || errPayload?.code === 'TOO_LARGE') {
+            showToast('⚠️ 최대 5MB까지 공유할 수 있습니다.');
           }
           break;
         }
@@ -190,6 +203,21 @@ export default function App() {
     return () => window.removeEventListener('auth:expired', handler);
   }, []);
 
+  // ─── Auto-prune items older than 10 minutes ──────────────────────────────────
+  const { removeItem } = useClipboardStore();
+  useEffect(() => {
+    const EXPIRY_MS = 10 * 60 * 1000;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      items.forEach((item) => {
+        if (now - item.createdAt > EXPIRY_MS) {
+          removeItem(item.id);
+        }
+      });
+    }, 30_000); // check every 30s
+    return () => clearInterval(timer);
+  }, [items, removeItem]);
+
   // ─── Login handler ───────────────────────────────────────────────────────────
   const handleLoginSuccess = (loggedInUser: User, accessToken: string) => {
     setUser(loggedInUser);
@@ -214,6 +242,48 @@ export default function App() {
   ) => {
     sendMessage(msg);
     setSyncEnabled(msg.type === 'SYNC_ENABLE');
+  };
+
+  // ─── File/image share handler (mobile) ───────────────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileShare = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!fileInputRef.current) return;
+    fileInputRef.current.value = '';
+    if (!file) return;
+
+    const MAX = 5 * 1024 * 1024;
+    if (file.size > MAX) {
+      showToast('⚠️ 최대 5MB까지 공유할 수 있습니다.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const isImage = file.type.startsWith('image/');
+      if (isImage) {
+        const { imageUrl } = await endpoints.uploadImage(file);
+        sendMessage({
+          type: 'CLIPBOARD_UPDATE',
+          payload: { contentType: 'image', imageUrl },
+          timestamp: Date.now(),
+        });
+      } else {
+        const { fileUrl, fileName, fileSize } = await endpoints.uploadFile(file);
+        sendMessage({
+          type: 'CLIPBOARD_UPDATE',
+          payload: { contentType: 'file', fileUrl, fileName, fileSize } as never,
+          timestamp: Date.now(),
+        });
+      }
+      showToast('공유되었습니다.');
+    } catch {
+      showToast('⚠️ 업로드에 실패했습니다.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   if (authLoading) return null;
@@ -250,6 +320,15 @@ export default function App() {
         </div>
       )}
 
+      {/* ── Hidden file input ── */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,*/*"
+        style={{ display: 'none' }}
+        onChange={handleFileShare}
+      />
+
       {/* ── Header ── */}
       <header style={styles.header}>
         <h1 style={styles.logo}>ModuShare</h1>
@@ -262,6 +341,14 @@ export default function App() {
             title={isConnected ? 'Connected' : 'Reconnecting…'}
           />
           <SyncToggle enabled={syncEnabled} onToggle={handleSyncToggle} />
+          <button
+            style={{ ...styles.uploadBtn, opacity: uploading ? 0.6 : 1 }}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            title="Share image or file (max 5MB)"
+          >
+            {uploading ? '…' : '+ Share'}
+          </button>
           <ShareManager
             pendingInvitations={pendingInvitations}
             onInvitationHandled={(id) => setPendingInvitations((prev) => prev.filter((i) => i.id !== id))}
@@ -370,6 +457,16 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#fff',
     cursor: 'pointer',
     fontSize: '0.8125rem',
+  },
+  uploadBtn: {
+    padding: '4px 12px',
+    borderRadius: 6,
+    border: '1px solid #6366f1',
+    background: '#fff',
+    color: '#6366f1',
+    cursor: 'pointer',
+    fontSize: '0.8125rem',
+    fontWeight: 600,
   },
   main: { flex: 1, padding: '1.5rem', background: '#f5f5f7' },
   content: { maxWidth: 720, margin: '0 auto' },

@@ -2,10 +2,13 @@ export interface ClipboardItem {
   id: string;
   userId: string;
   deviceId: string;
-  contentType: 'text' | 'image';
+  contentType: 'text' | 'image' | 'file';
   contentText?: string;
   imagePath?: string;
   imageUrl?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
   createdAt: number;
   isDeleted: boolean;
 }

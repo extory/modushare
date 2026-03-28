@@ -122,4 +122,15 @@ export const endpoints = {
     );
     return data;
   },
+
+  async uploadFile(file: File): Promise<{ fileUrl: string; fileName: string; fileSize: number }> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    const { data } = await apiClient.post<{ fileUrl: string; fileName: string; fileSize: number }>(
+      '/upload/file',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return data;
+  },
 };
