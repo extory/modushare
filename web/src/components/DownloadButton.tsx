@@ -12,7 +12,7 @@ interface Release {
   assets: ReleaseAsset[];
 }
 
-export function DownloadButton() {
+export function DownloadButton({ isMobile }: { isMobile?: boolean }) {
   const [open, setOpen] = useState(false);
   const [release, setRelease] = useState<Release | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,8 +46,8 @@ export function DownloadButton() {
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button style={styles.btn} onClick={handleOpen} title="클라이언트 다운로드">
-        ↓ 다운로드
+      <button style={isMobile ? styles.iconBtn : styles.btn} onClick={handleOpen} title="클라이언트 다운로드">
+        {isMobile ? '⬇️' : '↓ 다운로드'}
       </button>
 
       {open && (
@@ -78,6 +78,20 @@ export function DownloadButton() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  iconBtn: {
+    padding: '6px 10px',
+    borderRadius: 8,
+    border: '1px solid #e0e0e0',
+    background: '#fff',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    lineHeight: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 36,
+    minHeight: 36,
+  },
   btn: {
     padding: '4px 12px',
     borderRadius: 6,
@@ -89,15 +103,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
   },
   dropdown: {
-    position: 'absolute',
-    right: 0,
-    top: 'calc(100% + 6px)',
+    position: 'fixed',
+    right: 8,
+    top: 64,
     background: '#fff',
     border: '1px solid #e0e0e0',
     borderRadius: 10,
     boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
     minWidth: 200,
-    zIndex: 100,
+    zIndex: 200,
     overflow: 'hidden',
   },
   version: {

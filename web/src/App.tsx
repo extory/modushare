@@ -34,11 +34,22 @@ function useHash() {
   return hash;
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState(() => window.innerWidth <= 640);
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 640);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
 export default function App() {
   const hash = useHash();
   if (hash === '#/terms') return <TermsOfService />;
   if (hash === '#/privacy') return <PrivacyPolicy />;
 
+  const isMobile = useIsMobile();
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -330,40 +341,50 @@ export default function App() {
       />
 
       {/* ── Header ── */}
-      <header style={styles.header}>
-        <h1 style={styles.logo}>ModuShare</h1>
-        <div style={styles.headerRight}>
-          <div
-            style={{
-              ...styles.dot,
-              background: isConnected ? '#22c55e' : '#f59e0b',
-            }}
-            title={isConnected ? 'Connected' : 'Reconnecting…'}
-          />
-          <SyncToggle enabled={syncEnabled} onToggle={handleSyncToggle} />
-          <button
-            style={{ ...styles.uploadBtn, opacity: uploading ? 0.6 : 1 }}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            title="Share image or file (max 5MB)"
-          >
-            {uploading ? '…' : '+ Share'}
-          </button>
-          <ShareManager
-            pendingInvitations={pendingInvitations}
-            onInvitationHandled={(id) => setPendingInvitations((prev) => prev.filter((i) => i.id !== id))}
-          />
-          <DownloadButton />
-          {user.role === 'admin' && (
-            <button style={styles.adminBtn} onClick={() => setShowAdmin(true)}>
-              Admin
+      <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
+        <div style={styles.headerTop}>
+          <h1 style={styles.logo}>ModuShare</h1>
+          <div style={styles.headerRight}>
+            <div
+              style={{
+                ...styles.dot,
+                background: isConnected ? '#22c55e' : '#f59e0b',
+              }}
+              title={isConnected ? 'Connected' : 'Reconnecting…'}
+            />
+            <SyncToggle enabled={syncEnabled} onToggle={handleSyncToggle} isMobile={isMobile} />
+            <button
+              style={{ ...styles.iconBtn, opacity: uploading ? 0.6 : 1 }}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              title="Share image or file (max 5MB)"
+            >
+              {uploading ? '…' : '📤'}
             </button>
-          )}
-          <span style={styles.username}>{user.username}</span>
-          <button style={styles.logoutBtn} onClick={handleLogout}>
-            Sign Out
-          </button>
+            <ShareManager
+              pendingInvitations={pendingInvitations}
+              onInvitationHandled={(id) => setPendingInvitations((prev) => prev.filter((i) => i.id !== id))}
+              isMobile={isMobile}
+            />
+            <DownloadButton isMobile={isMobile} />
+            {user.role === 'admin' && (
+              <button style={styles.iconBtn} onClick={() => setShowAdmin(true)} title="Admin">
+                ⚙️
+              </button>
+            )}
+            {!isMobile && <span style={styles.username}>{user.username}</span>}
+            <button style={styles.iconBtn} onClick={handleLogout} title="Sign Out">
+              {isMobile ? '⏻' : 'Sign Out'}
+            </button>
+          </div>
         </div>
+        {isMobile && (
+          <div style={styles.mobileUserRow}>
+            <span style={styles.mobileUsername}>{user.username}</span>
+            <span style={{ ...styles.dot, background: isConnected ? '#22c55e' : '#f59e0b', marginLeft: 4 }} />
+            <span style={styles.mobileConnStatus}>{isConnected ? 'Connected' : 'Reconnecting…'}</span>
+          </div>
+        )}
       </header>
 
       {/* ── Main ── */}
@@ -414,21 +435,44 @@ const styles: Record<string, React.CSSProperties> = {
   header: {
     background: '#fff',
     borderBottom: '1px solid #e0e0e0',
-    padding: '0 1.5rem',
-    height: 56,
+    padding: '0 1.25rem',
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column' as const,
     position: 'sticky',
     top: 0,
     zIndex: 10,
     boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
   },
+  headerMobile: {
+    padding: '0 0.75rem',
+  },
+  headerTop: {
+    height: 56,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   logo: { fontSize: '1.25rem', fontWeight: 700, color: '#6366f1' },
   headerRight: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.75rem',
+    gap: '0.5rem',
+  },
+  mobileUserRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.35rem',
+    paddingBottom: '0.5rem',
+    paddingTop: '0',
+  },
+  mobileUsername: {
+    fontSize: '0.75rem',
+    color: '#555',
+    fontWeight: 500,
+  },
+  mobileConnStatus: {
+    fontSize: '0.7rem',
+    color: '#aaa',
   },
   dot: {
     width: 8,
@@ -440,35 +484,23 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#555',
     fontWeight: 500,
   },
-  adminBtn: {
-    padding: '4px 12px',
-    borderRadius: 6,
-    border: '1px solid #6366f1',
-    background: '#6366f1',
-    color: '#fff',
-    cursor: 'pointer',
-    fontSize: '0.8rem',
-    fontWeight: 600,
-  },
-  logoutBtn: {
-    padding: '4px 12px',
-    borderRadius: 6,
-    border: '1px solid #d1d1d6',
+  iconBtn: {
+    padding: '6px 10px',
+    borderRadius: 8,
+    border: '1px solid #e0e0e0',
     background: '#fff',
     cursor: 'pointer',
-    fontSize: '0.8125rem',
+    fontSize: '1rem',
+    lineHeight: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 36,
+    minHeight: 36,
+    color: '#444',
+    fontWeight: 500,
   },
-  uploadBtn: {
-    padding: '4px 12px',
-    borderRadius: 6,
-    border: '1px solid #6366f1',
-    background: '#fff',
-    color: '#6366f1',
-    cursor: 'pointer',
-    fontSize: '0.8125rem',
-    fontWeight: 600,
-  },
-  main: { flex: 1, padding: '1.5rem', background: '#f5f5f7' },
+  main: { flex: 1, padding: 'clamp(0.75rem, 3vw, 1.5rem)', background: '#f5f5f7' },
   content: { maxWidth: 720, margin: '0 auto' },
   feedHeader: {
     display: 'flex',

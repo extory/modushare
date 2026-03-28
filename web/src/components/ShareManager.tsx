@@ -5,9 +5,10 @@ import { endpoints } from '../api/endpoints';
 interface Props {
   pendingInvitations: ShareInvitation[];
   onInvitationHandled: (id: string) => void;
+  isMobile?: boolean;
 }
 
-export function ShareManager({ pendingInvitations, onInvitationHandled }: Props) {
+export function ShareManager({ pendingInvitations, onInvitationHandled, isMobile }: Props) {
   const [partners, setPartners] = useState<SharePartner[]>([]);
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -68,8 +69,8 @@ export function ShareManager({ pendingInvitations, onInvitationHandled }: Props)
 
   return (
     <div style={styles.wrap}>
-      <button style={styles.triggerBtn} onClick={() => setOpen((v) => !v)}>
-        공유 관리
+      <button style={isMobile ? styles.iconBtn : styles.triggerBtn} onClick={() => setOpen((v) => !v)} title="공유 관리">
+        {isMobile ? '👥' : '공유 관리'}
         {hasPending && <span style={styles.badge}>{pendingInvitations.length}</span>}
       </button>
 
@@ -169,15 +170,22 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#fff', cursor: 'pointer', fontSize: '0.8125rem',
     display: 'flex', alignItems: 'center', gap: 6,
   },
+  iconBtn: {
+    padding: '6px 10px', borderRadius: 8, border: '1px solid #e0e0e0',
+    background: '#fff', cursor: 'pointer', fontSize: '1rem',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    minWidth: 36, minHeight: 36, position: 'relative' as const,
+  },
   badge: {
     background: '#ef4444', color: '#fff', borderRadius: '50%',
-    width: 16, height: 16, fontSize: '0.7rem', display: 'flex',
+    width: 16, height: 16, fontSize: '0.65rem', display: 'flex',
     alignItems: 'center', justifyContent: 'center', fontWeight: 700,
+    position: 'absolute' as const, top: -4, right: -4,
   },
   panel: {
-    position: 'absolute', right: 0, top: '2rem', width: 340,
+    position: 'fixed', right: 8, top: 64, width: 'min(340px, calc(100vw - 16px))',
     background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-    padding: '1rem', zIndex: 100,
+    padding: '1rem', zIndex: 200,
   },
   panelHeader: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem',

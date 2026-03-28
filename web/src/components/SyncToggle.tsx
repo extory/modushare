@@ -4,9 +4,10 @@ import { WSMessage } from '@modushare/shared';
 interface SyncToggleProps {
   enabled: boolean;
   onToggle: (msg: Omit<WSMessage, 'deviceId'> & { deviceId?: string }) => void;
+  isMobile?: boolean;
 }
 
-export function SyncToggle({ enabled, onToggle }: SyncToggleProps) {
+export function SyncToggle({ enabled, onToggle, isMobile }: SyncToggleProps) {
   const handleChange = () => {
     onToggle({
       type: enabled ? 'SYNC_DISABLE' : 'SYNC_ENABLE',
@@ -15,8 +16,8 @@ export function SyncToggle({ enabled, onToggle }: SyncToggleProps) {
   };
 
   return (
-    <div style={styles.container}>
-      <span style={styles.label}>{enabled ? 'Sync On' : 'Sync Off'}</span>
+    <div style={styles.container} title={enabled ? 'Sync On' : 'Sync Off'}>
+      {!isMobile && <span style={styles.label}>{enabled ? 'Sync On' : 'Sync Off'}</span>}
       <button
         role="switch"
         aria-checked={enabled}
