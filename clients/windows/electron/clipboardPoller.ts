@@ -52,11 +52,13 @@ export class ClipboardPoller extends EventEmitter {
     if (!this.store.get('syncEnabled')) return;
 
     const currentText = clipboard.readText();
+    const availableFormats = clipboard.availableFormats();
     const img = clipboard.readImage();
     const currentImageHash = img.isEmpty() ? '' : hashBuffer(img.toPNG());
 
     // ── Text changed ──────────────────────────────────────────────────────────
     if (currentText && currentText !== this.lastText) {
+      console.log('[poller] text changed, len=', currentText.length, 'formats=', availableFormats);
       this.lastText = currentText;
       const textHash = hashBuffer(Buffer.from(currentText, 'utf-8'));
       if (textHash === this.lastReceivedHash) {
@@ -66,10 +68,12 @@ export class ClipboardPoller extends EventEmitter {
       this.lastReceivedHash = '';
 
       if (!this.wsClient.isConnected()) {
+        console.log('[poller] not connected, reconnecting');
         this.wsClient.reconnectNow();
         return;
       }
 
+      console.log('[poller] sending text update');
       this.wsClient.sendClipboardUpdate({ type: 'text', text: currentText });
       return;
     }
