@@ -1,3 +1,4 @@
+import db from '../db';
 import { IncomingMessage, Server } from 'http';
 import WebSocket, { WebSocketServer } from 'ws';
 import { WSMessage, ClipboardUpdatePayload, ClientHelloPayload, VersionMismatchPayload, FileTransferPayload } from '@modushare/shared';
@@ -69,6 +70,7 @@ export function attachWebSocketServer(httpServer: Server): WebSocketServer {
         }
       }, PING_INTERVAL_MS);
 
+      let clipboardQueue = Promise.resolve();
       ws.on('message', async (data: WebSocket.Data) => {
         let msg: WSMessage;
         try {
@@ -96,12 +98,15 @@ export function attachWebSocketServer(httpServer: Server): WebSocketServer {
           }
 
           case 'CLIPBOARD_UPDATE':
-            await handleClipboardUpdate(
+            clipboardQueue = clipboardQueue.then(() => handleClipboardUpdate(
               userId,
               msg.deviceId,
               msg.payload as ClipboardUpdatePayload,
               ws
-            );
+            )).catch(err => {
+              console.error('[clipboard] Update failed:', err);
+              if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ERROR', payload: { code: 'UPDATE_FAILED', message: '클립보드 공유에 실패했습니다.' }, timestamp: Date.now(), deviceId: 'server' }));
+            });
             break;
 
           case 'SYNC_ENABLE':
@@ -117,6 +122,10 @@ export function attachWebSocketServer(httpServer: Server): WebSocketServer {
             const myVersion = hello?.clientVersion ?? '0.0.0';
             const myPlatform = hello?.platform ?? 'unknown';
 
+            if (hello?.directClipboard === true && typeof msg.deviceId === 'string' && msg.deviceId.length <= 128) {
+              db.prepare(`INSERT INTO clipboard_devices VALUES (?, ?, ?) ON CONFLICT(user_id, device_id) DO UPDATE SET name = excluded.name`)
+                .run(userId, msg.deviceId, String(hello.deviceName || myPlatform).slice(0, 120));
+            }
             // Register this client's version
             userSessions.setClientMeta(ws, myVersion, myPlatform);
 

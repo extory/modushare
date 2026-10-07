@@ -401,3 +401,46 @@ npm run build
 ## License
 
 MIT © ModuShare Contributors
+
+## Desktop clipboard sharing (Electron: Windows / macOS)
+
+The Electron app in `clients/windows` builds both Windows and macOS installers.
+Both sender and recipient must use this updated desktop client and the updated
+server (migration `010_direct_clipboard.sql`). The separate legacy Swift menu-bar
+client does not implement the new direct-send inbox.
+
+- **자동 클립보드 공유 (최신 1건)** is a per-device option in Preferences and the
+  tray menu. Copying text or an image automatically replaces the receiving
+  clipboard. Both ends show a paper-plane animation. Automatic copies never enter
+  the direct-send inbox. Earlier copies remain in the sender's web history under
+  the existing 10-minute retention policy.
+- After copying, right-click the **ModuShare tray icon**, choose **복사한 내용
+  보내기…**, select one or more devices, and click **보내기**. The app snapshots the
+  clipboard when opening the send window. Targets include your other registered
+  devices and devices belonging to existing share partners. Sending supports text
+  and images up to 5 MB and works with automatic sharing disabled.
+- Direct deliveries persist on the server per recipient device, including offline
+  devices. Only the latest ten are retained. Reconnection checks for new arrivals.
+  They do not replace the clipboard until selected.
+- Open **받은 복사함 (최근 10건)** from the tray, double-click the Windows tray icon,
+  or click the macOS Dock icon. Each entry includes sender and local date/time
+  down to seconds. Select an entry, switch to the destination app, and press
+  **Ctrl+V / ⌘V**. ModuShare does not inject keystrokes into another application.
+- Animations use a transparent, non-interactive overlay on the pointer's display:
+  paper folds and flies right on send; arrivals fly toward the reserved Dock or
+  taskbar edge (bottom fallback for auto-hidden bars). Reduced-motion settings
+  replace travel with a brief fade. The destination is the bar area, not an exact
+  OS-provided app-icon coordinate.
+
+The context menu is available on ModuShare's tray icon and sharing windows;
+this does not install a context-menu extension into other applications.
+
+Validation (after installing dependencies):
+
+```sh
+npm run build
+npm run build:tsc --prefix clients/windows
+# Integration test uses node:sqlite and requires Node 22.13+ and a loopback port.
+node --test server/test/directClipboard.test.cjs
+node --test clients/windows/test/clipboard.test.cjs
+```

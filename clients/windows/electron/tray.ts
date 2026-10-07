@@ -1,3 +1,4 @@
+import { openClipboardSender, openInbox } from './clipboardSharing';
 import { Tray, Menu, shell, app, nativeImage, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -129,7 +130,9 @@ export function createTray(
       },
       { type: 'separator' },
       {
-        label: syncEnabled ? 'Disable Sync' : 'Enable Sync',
+        label: '자동 클립보드 공유 (최신 1건)',
+        type: 'checkbox',
+        checked: syncEnabled,
         click: () => {
           const newVal = !store.get('syncEnabled');
           store.set('syncEnabled', newVal);
@@ -137,12 +140,13 @@ export function createTray(
             wsClient.sendSyncEnable();
             poller.start();
           } else {
-            wsClient.sendSyncDisable();
             poller.stop();
           }
           updateMenu();
         },
       },
+      { label: '복사한 내용 보내기…', enabled: !!store.get('accessToken'), click: openClipboardSender },
+      { label: '받은 복사함 (최근 10건)', enabled: !!store.get('accessToken'), click: openInbox },
       {
         label: 'View History in Browser',
         click: () => {
@@ -204,6 +208,9 @@ export function createTray(
     tray.setContextMenu(menu);
   };
 
+  tray.on('double-click', openInbox);
+  if (process.platform === 'darwin') tray.on('click', openInbox);
+  wsClient.on('directClipboard', startFlash);
   updateMenu();
   wsClient.on('statusChange', updateMenu);
   wsClient.on('shareInvitation', () => {

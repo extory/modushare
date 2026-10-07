@@ -48,16 +48,27 @@ export class ClipboardPoller extends EventEmitter {
     this.timer = null;
   }
 
+  adoptClipboard(): void {
+    this.lastText = clipboard.readText();
+    const image = clipboard.readImage();
+    this.lastImageHash = image.isEmpty() ? '' : hashBuffer(image.toPNG());
+    this.lastReceivedHash = '';
+  }
+
   private poll(): void {
-    if (!this.store.get('syncEnabled')) return;
+    if (!this.store.get('syncEnabled')) { this.adoptClipboard(); return; }
 
     const currentText = clipboard.readText();
     const availableFormats = clipboard.availableFormats();
     const img = clipboard.readImage();
     const currentImageHash = img.isEmpty() ? '' : hashBuffer(img.toPNG());
 
+    const textChanged = currentText !== this.lastText;
+    const imageChanged = currentImageHash !== this.lastImageHash;
+    this.lastText = currentText;
+    this.lastImageHash = currentImageHash;
     // ── Text changed ──────────────────────────────────────────────────────────
-    if (currentText && currentText !== this.lastText) {
+    if (currentText && textChanged) {
       console.log('[poller] text changed, len=', currentText.length, 'formats=', availableFormats);
       this.lastText = currentText;
       const textHash = hashBuffer(Buffer.from(currentText, 'utf-8'));
@@ -79,7 +90,7 @@ export class ClipboardPoller extends EventEmitter {
     }
 
     // ── Image changed ─────────────────────────────────────────────────────────
-    if (!img.isEmpty() && currentImageHash !== this.lastImageHash) {
+    if (!img.isEmpty() && imageChanged) {
       this.lastImageHash = currentImageHash;
 
       if (currentImageHash === this.lastReceivedHash) {

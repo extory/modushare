@@ -1,7 +1,6 @@
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import { clipboard, nativeImage, Notification } from 'electron';
-import crypto from 'crypto';
 import axios from 'axios';
 import Store from 'electron-store';
 import { AppStore } from './main';
@@ -11,7 +10,7 @@ const MAX_INLINE_BYTES = 5 * 1024 * 1024; // 5 MB
 const INITIAL_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
 const CLIENT_VERSION = '1.2.0';
-const CLIENT_PLATFORM = 'windows';
+const CLIENT_PLATFORM = process.platform === 'darwin' ? 'macos' : 'windows';
 const DOWNLOAD_URL = 'https://github.com/extory/modushare/releases/latest';
 
 interface WSEnvelope {
@@ -27,6 +26,8 @@ export class WSClient extends EventEmitter {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private connected = false;
   private poller: import('./clipboardPoller').ClipboardPoller | null = null;
+  private clipboardGeneration = 0;
+  private intentionallyDisconnected = false;
   private hasShownFirstCopyToast = false;
   private hasShownVersionToast = false;
 
@@ -39,6 +40,8 @@ export class WSClient extends EventEmitter {
   }
 
   connect(): void {
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
+    this.intentionallyDisconnected = false;
     const token = this.store.get('accessToken');
     if (!token) return;
 
@@ -48,21 +51,25 @@ export class WSClient extends EventEmitter {
     try {
       this.ws = new WebSocket(wsUrl, ['modushare', token]);
 
+      const connection = this.ws;
       this.ws.on('open', () => {
+        if (this.ws !== connection) return;
         console.log('[ws] Connected');
         this.connected = true;
         this.backoff = INITIAL_BACKOFF_MS;
+        if (this.store.get('syncEnabled')) this.sendSyncEnable();
         this.emit('statusChange');
         // Announce version so server can detect mismatches
         this.sendRaw({
           type: 'CLIENT_HELLO',
-          payload: { clientVersion: CLIENT_VERSION, platform: CLIENT_PLATFORM } as Record<string, unknown>,
+          payload: { clientVersion: CLIENT_VERSION, platform: CLIENT_PLATFORM, directClipboard: true, deviceName: require('os').hostname() } as Record<string, unknown>,
           timestamp: Date.now(),
           deviceId: this.store.get('deviceId'),
         });
       });
 
       this.ws.on('message', (data: WebSocket.Data) => {
+        if (this.ws !== connection) return;
         try {
           const msg = JSON.parse(data.toString()) as WSEnvelope;
           this.handleMessage(msg);
@@ -72,6 +79,7 @@ export class WSClient extends EventEmitter {
       });
 
       this.ws.on('close', () => {
+        if (this.ws !== connection) return;
         this.connected = false;
         this.ws = null;
         this.emit('statusChange');
@@ -80,7 +88,7 @@ export class WSClient extends EventEmitter {
 
       this.ws.on('error', (err) => {
         console.error('[ws] Error:', err.message);
-        this.ws?.terminate();
+        connection.terminate();
       });
     } catch (err) {
       console.error('[ws] Connection failed:', err);
@@ -97,6 +105,8 @@ export class WSClient extends EventEmitter {
   }
 
   disconnect(): void {
+    this.intentionallyDisconnected = true;
+    this.clipboardGeneration++;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -111,6 +121,7 @@ export class WSClient extends EventEmitter {
   }
 
   sendClipboardUpdate(event: ClipboardChangedEvent): void {
+    this.clipboardGeneration++;
     if (!this.connected || !this.ws) return;
 
     const deviceId = this.store.get('deviceId');
@@ -162,61 +173,14 @@ export class WSClient extends EventEmitter {
         this.sendRaw({ type: 'PONG', timestamp: Date.now(), deviceId: this.store.get('deviceId') });
         break;
 
+      case 'CLIPBOARD_DELIVERY':
+        if (msg.payload?.targetDeviceId === this.store.get('deviceId')) this.emit('directClipboard');
+        break;
       case 'CLIPBOARD_UPDATE': {
-        const payload = msg.payload as {
-          contentType?: string;
-          content?: string;
-          imageData?: string;
-          imageUrl?: string;
-          senderEmail?: string;
-        };
-        if (payload.contentType === 'text' && payload.content) {
-          const hash = crypto
-            .createHash('sha256')
-            .update(Buffer.from(payload.content, 'utf-8'))
-            .digest('hex');
-          if (this.poller) this.poller.lastReceivedHash = hash;
-          clipboard.writeText(payload.content);
-          this.emit('remoteClipboard', { contentType: 'text', senderEmail: payload.senderEmail });
-        } else if (payload.contentType === 'image') {
-          if (payload.imageData) {
-            const buf = Buffer.from(payload.imageData, 'base64');
-            const img = nativeImage.createFromBuffer(buf);
-            const pngBuf = img.toPNG();
-            const hash = crypto.createHash('sha256').update(pngBuf).digest('hex');
-            if (this.poller) this.poller.lastReceivedHash = hash;
-            clipboard.writeImage(img);
-            this.emit('remoteClipboard', { contentType: 'image', senderEmail: payload.senderEmail });
-          } else if (payload.imageUrl) {
-            // Download image from server and write to clipboard
-            const serverUrl = this.store.get('serverUrl');
-            const token = this.store.get('accessToken');
-            const fullUrl = payload.imageUrl.startsWith('http')
-              ? payload.imageUrl
-              : `${serverUrl}${payload.imageUrl}`;
-            console.log('[ws] Downloading image from:', fullUrl);
-            axios.get(fullUrl, {
-              responseType: 'arraybuffer',
-              headers: { Authorization: `Bearer ${token}` },
-            }).then((res) => {
-              const buf = Buffer.from(res.data as ArrayBuffer);
-              console.log('[ws] Image downloaded, size:', buf.length, 'bytes');
-              const img = nativeImage.createFromBuffer(buf);
-              if (img.isEmpty()) {
-                console.error('[ws] nativeImage is empty, clipboard write skipped');
-                return;
-              }
-              const pngBuf = img.toPNG();
-              const hash = crypto.createHash('sha256').update(pngBuf).digest('hex');
-              if (this.poller) this.poller.lastReceivedHash = hash;
-              clipboard.writeImage(img);
-              this.emit('remoteClipboard', { contentType: 'image', senderEmail: payload.senderEmail });
-              console.log('[ws] Image written to clipboard');
-            }).catch((err) => {
-              console.error('[ws] Failed to download image:', err.message);
-            });
-          }
-        }
+        if (!this.store.get('syncEnabled')) break;
+        void this.writeClipboard(msg.payload as any, true).then(written => {
+          if (written) this.emit('remoteClipboard', msg.payload);
+        }).catch(err => this.emit('tooLarge', `클립보드 수신 실패: ${err.message}`));
         break;
       }
 
@@ -231,6 +195,7 @@ export class WSClient extends EventEmitter {
       }
 
       case 'CLIPBOARD_ACK': {
+        this.emit('clipboardSent');
         if (!this.hasShownFirstCopyToast) {
           this.hasShownFirstCopyToast = true;
           const sharedWithCount = (msg.payload as { sharedWithCount?: number })?.sharedWithCount ?? 0;
@@ -243,12 +208,10 @@ export class WSClient extends EventEmitter {
       }
 
       case 'SYNC_ENABLE':
-        this.store.set('syncEnabled', true);
         this.emit('statusChange');
         break;
 
       case 'SYNC_DISABLE':
-        this.store.set('syncEnabled', false);
         this.emit('statusChange');
         break;
 
@@ -306,8 +269,36 @@ export class WSClient extends EventEmitter {
     }
   }
 
+  async writeClipboard(payload: { contentType?: string; content?: string; imageData?: string; imageUrl?: string }, automatic = false): Promise<boolean> {
+    const generation = ++this.clipboardGeneration;
+    const previousText = clipboard.readText();
+    const previousImage = clipboard.readImage().toPNG();
+    let image: Electron.NativeImage | undefined;
+    if (payload.contentType === 'image') {
+      let buffer: Buffer;
+      if (payload.imageData) buffer = Buffer.from(payload.imageData, 'base64');
+      else if (payload.imageUrl) {
+        const server = new URL(this.store.get('serverUrl'));
+        const url = new URL(payload.imageUrl, server);
+        if (url.origin !== server.origin || !url.pathname.startsWith('/uploads/')) throw new Error('허용되지 않는 이미지 주소');
+        const response = await axios.get(url.href, { responseType: 'arraybuffer', maxContentLength: MAX_INLINE_BYTES,
+          headers: { Authorization: `Bearer ${this.store.get('accessToken')}` }, maxRedirects: 0 });
+        buffer = Buffer.from(response.data);
+      } else return false;
+      image = nativeImage.createFromBuffer(buffer);
+      if (image.isEmpty()) throw new Error('이미지를 읽을 수 없습니다.');
+    } else if (payload.contentType !== 'text' || typeof payload.content !== 'string') return false;
+    // An older image download must never overwrite a newer copy.
+    if (clipboard.readText() !== previousText || !clipboard.readImage().toPNG().equals(previousImage)) return false;
+    if (generation !== this.clipboardGeneration || (automatic && !this.store.get('syncEnabled'))) return false;
+    if (image) clipboard.writeImage(image);
+    else clipboard.writeText(payload.content!);
+    this.poller?.adoptClipboard();
+    return true;
+  }
+
   private scheduleReconnect(): void {
-    if (this.reconnectTimer) return;
+    if (this.intentionallyDisconnected || !this.store.get('accessToken') || this.reconnectTimer) return;
     console.log(`[ws] Reconnecting in ${this.backoff}ms…`);
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null;

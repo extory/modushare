@@ -181,10 +181,10 @@ export function setupIpcHandlers(
           wsClient.sendSyncEnable();
           poller.start();
         } else {
-          wsClient.sendSyncDisable();
           poller.stop();
         }
       }
+      wsClient.emit('statusChange');
       if (settings.autoUpdate !== undefined) {
         store.set('autoUpdate', settings.autoUpdate);
       }

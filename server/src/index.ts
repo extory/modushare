@@ -10,6 +10,7 @@ import { runMigrations } from './db';
 import { errorHandler } from './middleware/errorHandler';
 import authRouter from './routes/auth';
 import clipboardRouter from './routes/clipboard';
+import directClipboardRouter from './routes/directClipboard';
 import uploadRouter from './routes/upload';
 import shareRouter from './routes/share';
 import adminRouter from './routes/admin';
@@ -44,6 +45,7 @@ app.use(cookieParser());
 
 // ─── API routes ───────────────────────────────────────────────────────────────
 app.use('/auth', authRouter);
+app.use('/clipboard/direct', directClipboardRouter);
 app.use('/clipboard', clipboardRouter);
 app.use('/upload', uploadRouter);
 app.use('/share', shareRouter);

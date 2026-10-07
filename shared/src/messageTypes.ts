@@ -34,6 +34,8 @@ export interface AckPayload {
 }
 
 export interface ClientHelloPayload {
+  directClipboard?: boolean;
+  deviceName?: string;
   /** Semantic version string, e.g. "1.2.0" */
   clientVersion: string;
   /** 'windows' | 'macos' | 'web' */
@@ -49,6 +51,7 @@ export interface VersionMismatchPayload {
 // ─── Message type discriminator ──────────────────────────────────────────────
 
 export type WSMessageType =
+  | 'CLIPBOARD_DELIVERY'
   | 'CLIPBOARD_UPDATE'
   | 'SYNC_ENABLE'
   | 'SYNC_DISABLE'

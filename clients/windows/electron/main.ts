@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
+import { setupClipboardSharing } from './clipboardSharing';
 import { createTray } from './tray';
 import { ClipboardPoller } from './clipboardPoller';
 import { WSClient } from './wsClient';
@@ -15,6 +16,7 @@ export interface AppStore {
   deviceId: string;
   userEmail: string;
   autoUpdate: boolean;
+  inboxHeads: Record<string, string>;
 }
 
 // ─── Electron store ───────────────────────────────────────────────────────────
@@ -27,6 +29,7 @@ export const store = new Store<AppStore>({
     deviceId: require('uuid').v4(),
     userEmail: '',
     autoUpdate: true,
+    inboxHeads: {},
   },
 });
 
@@ -60,6 +63,8 @@ app.whenReady().then(() => {
   const wsClient = new WSClient(store);
   const poller = new ClipboardPoller(wsClient, store);
 
+  wsClient.setPoller(poller);
+  setupClipboardSharing(store, wsClient);
   setupIpcHandlers(wsClient, poller, store);
   createTray(store, wsClient, poller);
   setupAutoUpdater(store);
