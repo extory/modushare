@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /auth/
+Disallow: /clipboard/
+Disallow: /share/
+Disallow: /files/
+Disallow: /upload/
+Disallow: /uploads/
+Disallow: /admin/
+
+Sitemap: https://modushare.extory.co/sitemap.xml

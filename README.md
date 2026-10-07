@@ -462,3 +462,54 @@ node --test clients/windows/test/clipboard.test.cjs
   Applications. It does not claim to install silently.
 - Apply these fixes by deploying server/web together and publishing a new desktop
   release. A tag build injects the application version; do not reuse an old tag.
+
+## Search discovery (SEO / AEO)
+
+The public homepage `/` is static Korean HTML with service descriptions, usage
+steps and visible FAQs. The private React application is served at `/app/` and
+uses `noindex, follow`. Existing `/#/terms` and `/#/privacy` links redirect to the
+corresponding app policy pages. Both HTML entry points are included in the Vite
+production build; deploy the updated server and web together.
+
+Public discovery files:
+
+- `/robots.txt`: crawl guidance and sitemap location; it is not access control.
+- `/sitemap.xml`: the canonical public homepage only.
+- Homepage JSON-LD: WebSite, SoftwareApplication and FAQPage, matching visible
+  content. No fabricated ratings or unsupported feature claims are included.
+
+After deploying:
+
+1. Check `https://modushare.extory.co/`, `/app/`, `/robots.txt` and `/sitemap.xml`.
+2. Verify ownership of the site in Google Search Console (DNS verification for a
+   domain property, or the supported verification method for a URL-prefix property).
+3. Submit `https://modushare.extory.co/sitemap.xml` in the Sitemaps report.
+4. Inspect `https://modushare.extory.co/`, run the live URL test and request indexing.
+5. Monitor page indexing and impressions for 모두쉐어, ModuShare, 클립보드 공유,
+   Windows Mac 복사 붙여넣기 and related queries. Search indexing, ranking and
+   AI-answer citations depend on each search service; markup does not guarantee them.
+
+Search Console verification values are account-specific and must come from the
+site owner. FAQ markup describes the page; it does not imply eligibility for a
+Google FAQ rich result.
+
+### Landing film
+
+The homepage uses the selected 10.375-second animated film at
+`web/public/media/modushare-intro.mp4` with `modushare-intro-poster.jpg`.
+The film follows writing “hello world”, folding and throwing a paper airplane,
+and receiving and opening it. The production MP4 is compressed H.264 with
+fast-start metadata and no audio track for muted autoplay. Playback captions
+in `web/src/landing.ts` match the final edit. Video experiments are kept locally
+in the git-ignored `artifacts/landing-video-drafts/`, outside the deployed public
+folder. `web/scripts/render-intro.cjs` is the earlier vector prototype and does
+not generate the selected film. Normal web builds use the committed media and
+need neither ffmpeg nor a Gemini API key.
+
+The muted inline film plays once, then scrolls to the introduction only if the
+visitor has not already interacted with the page. Playback controls, a skip link,
+a poster on playback failure, and reduced-motion handling are provided. The
+signup CTA opens `/app/?mode=register`; login opens `/app/`, both preserving the
+existing authentication and clipboard workspace. The footer follows the Korean
+company details and layout observed on showcase.aline.team; legal links point to
+ModuShare's own policy pages and contact uses the published support email.

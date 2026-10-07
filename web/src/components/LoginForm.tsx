@@ -27,7 +27,7 @@ declare global {
 const GOOGLE_CLIENT_ID = import.meta.env['VITE_GOOGLE_CLIENT_ID'] as string ?? '';
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
-  const [mode, setMode] = useState<Mode>('login');
+  const [mode, setMode] = useState<Mode>(() => new URLSearchParams(window.location.search).get('mode') === 'register' ? 'register' : 'login');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

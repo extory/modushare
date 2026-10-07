@@ -62,8 +62,12 @@ const webDistPath = process.env['WEB_DIST_PATH']
   : path.resolve(__dirname, '../../web/dist');
 if (config.NODE_ENV === 'production' && fs.existsSync(webDistPath)) {
   app.use(express.static(webDistPath));
+  app.get('/app/*', (_req, res) => {
+    res.setHeader('X-Robots-Tag', 'noindex, follow');
+    res.sendFile(path.join(webDistPath, 'app/index.html'));
+  });
   app.get('*', (_req, res) => {
-    res.sendFile(path.join(webDistPath, 'index.html'));
+    res.status(404).type('text').send('페이지를 찾을 수 없습니다. https://modushare.extory.co/');
   });
 }
 
