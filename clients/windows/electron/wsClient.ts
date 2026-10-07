@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
-import { clipboard, nativeImage, Notification } from 'electron';
+import { app, clipboard, nativeImage, Notification } from 'electron';
 import axios from 'axios';
 import Store from 'electron-store';
 import { AppStore } from './main';
@@ -9,7 +9,7 @@ import { ClipboardChangedEvent } from './clipboardPoller';
 const MAX_INLINE_BYTES = 5 * 1024 * 1024; // 5 MB
 const INITIAL_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
-const CLIENT_VERSION = '1.2.0';
+const CLIENT_VERSION = app.getVersion();
 const CLIENT_PLATFORM = process.platform === 'darwin' ? 'macos' : 'windows';
 const DOWNLOAD_URL = 'https://github.com/extory/modushare/releases/latest';
 
@@ -25,6 +25,7 @@ export class WSClient extends EventEmitter {
   private backoff = INITIAL_BACKOFF_MS;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private connected = false;
+  private refreshing = false;
   private poller: import('./clipboardPoller').ClipboardPoller | null = null;
   private clipboardGeneration = 0;
   private intentionallyDisconnected = false;
@@ -97,11 +98,15 @@ export class WSClient extends EventEmitter {
   }
 
   reconnectNow(): void {
+    if (this.refreshing || (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING))) return;
+    this.refreshing = true;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    this.tryRefreshToken().then(() => this.connect());
+    this.tryRefreshToken().then(() => {
+      if (!this.intentionallyDisconnected) this.connect();
+    }).finally(() => { this.refreshing = false; });
   }
 
   disconnect(): void {
@@ -138,7 +143,7 @@ export class WSClient extends EventEmitter {
       } else {
         // TODO: upload via REST and then send imageUrl
         // For now, skip oversized images
-        console.warn('[ws] Image too large for inline send, upload not yet implemented in desktop client');
+        this.emit('syncError', '이미지가 5MB를 초과하여 자동 공유하지 못했습니다.');
         return;
       }
     }
@@ -177,10 +182,14 @@ export class WSClient extends EventEmitter {
         if (msg.payload?.targetDeviceId === this.store.get('deviceId')) this.emit('directClipboard');
         break;
       case 'CLIPBOARD_UPDATE': {
-        if (!this.store.get('syncEnabled')) break;
+        if (!this.store.get('syncEnabled')) {
+          this.emit('syncError', '복사 내용이 도착했지만 이 기기의 자동 공유가 꺼져 있습니다. 트레이 메뉴에서 켜 주세요.');
+          break;
+        }
         void this.writeClipboard(msg.payload as any, true).then(written => {
           if (written) this.emit('remoteClipboard', msg.payload);
-        }).catch(err => this.emit('tooLarge', `클립보드 수신 실패: ${err.message}`));
+          else this.emit('syncError', '더 최신의 로컬 복사가 있어 수신 내용을 적용하지 않았습니다.');
+        }).catch(err => this.emit('syncError', `클립보드 수신 실패: ${err.message}`));
         break;
       }
 
@@ -190,6 +199,8 @@ export class WSClient extends EventEmitter {
           this.emit('quotaExceeded');
         } else if (errPayload?.code === 'TOO_LARGE') {
           this.emit('tooLarge', errPayload.message ?? '최대 5MB까지 전송할 수 있습니다.');
+        } else {
+          this.emit('syncError', errPayload?.message ?? '서버에서 클립보드 공유를 거부했습니다.');
         }
         break;
       }

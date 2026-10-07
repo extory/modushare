@@ -1,5 +1,5 @@
 import { openClipboardSender, openInbox } from './clipboardSharing';
-import { Tray, Menu, shell, app, nativeImage, dialog } from 'electron';
+import { Tray, Menu, shell, app, nativeImage, dialog, Notification } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import FormData from 'form-data';
@@ -50,24 +50,21 @@ export function createTray(
     tray.setImage(iconNormal);
   }
 
+  function notify(title: string, content: string): void {
+    new Notification({ title, body: content }).show();
+  }
+  wsClient.on('syncError', (message: string) => notify('ModuShare – 공유 확인 필요', message));
+
   // WSClient에서 신규 원격 복사 이벤트 수신
   wsClient.on('remoteClipboard', (info: { contentType?: string; senderEmail?: string }) => {
     startFlash();
     const typeLabel = info?.contentType === 'image' ? '이미지' : '텍스트';
     const sender = info?.senderEmail ?? '상대방';
-    tray.displayBalloon({
-      title: 'ModuShare',
-      content: `${sender} copied (${typeLabel})`,
-      iconType: 'info',
-    });
+    notify('ModuShare', `${sender} · ${typeLabel} 수신 완료. ⌘V / Ctrl+V로 붙여넣으세요.`);
   });
 
   wsClient.on('tooLarge', (message: string) => {
-    tray.displayBalloon({
-      title: 'ModuShare – 크기 초과',
-      content: message,
-      iconType: 'warning',
-    });
+    notify('ModuShare – 공유 오류', message);
   });
 
   wsClient.on('fileTransfer', (ft: { fileName?: string; fileSize?: number; fileUrl?: string; senderEmail?: string }) => {

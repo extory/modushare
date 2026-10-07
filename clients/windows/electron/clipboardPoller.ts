@@ -63,6 +63,12 @@ export class ClipboardPoller extends EventEmitter {
     const img = clipboard.readImage();
     const currentImageHash = img.isEmpty() ? '' : hashBuffer(img.toPNG());
 
+    // Keep the last delivered baseline while offline. Re-poll the latest clipboard
+    // after reconnect instead of silently consuming a copy that was never sent.
+    if (!this.wsClient.isConnected()) {
+      if (currentText !== this.lastText || currentImageHash !== this.lastImageHash) this.wsClient.reconnectNow();
+      return;
+    }
     const textChanged = currentText !== this.lastText;
     const imageChanged = currentImageHash !== this.lastImageHash;
     this.lastText = currentText;
