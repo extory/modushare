@@ -118,8 +118,8 @@
     <div class="section-title">Updates</div>
     <div class="row">
       <div>
-        <span class="row-label">자동 업데이트</span>
-        <p style="font-size:0.75rem;color:#888;margin-top:2px;">새 버전이 출시되면 자동으로 다운로드하고 설치합니다</p>
+        <span class="row-label">업데이트 자동 다운로드 (Windows)</span>
+        <p style="font-size:0.75rem;color:#888;margin-top:2px;">Windows는 자동 다운로드 후 설치를 선택합니다. macOS는 아래 버튼으로 DMG를 다운로드해 설치합니다.</p>
       </div>
       <label class="toggle">
         <input type="checkbox" id="autoUpdate" />
@@ -130,6 +130,7 @@
       <span class="row-label" id="currentVersionLabel" style="font-size:0.8rem;color:#888;"></span>
       <button class="small" id="checkUpdateBtn">지금 확인</button>
     </div>
+    <button id="downloadUpdateBtn" class="primary" disabled>업데이트 다운로드</button>
     <p class="status" id="updateStatus" style="display:none;margin-top:0.5rem;"></p>
   </div>
 
@@ -250,34 +251,34 @@
       setTimeout(() => { status.style.display = 'none'; }, 2000);
     });
 
-    document.getElementById('checkUpdateBtn').addEventListener('click', async () => {
-      const btn = document.getElementById('checkUpdateBtn');
-      const statusEl = document.getElementById('updateStatus');
-      btn.disabled = true;
-      btn.textContent = '확인 중…';
-      statusEl.style.display = 'none';
-      statusEl.style.color = '#555';
-
-      const result = await ipcRenderer.invoke('updater:check');
-      btn.disabled = false;
-      btn.textContent = '지금 확인';
-
-      if (!result.ok) {
-        statusEl.textContent = '개발 환경에서는 업데이트 확인이 지원되지 않습니다.';
-        statusEl.style.color = '#888';
-        statusEl.style.display = 'block';
-        return;
-      }
-      if (result.updateInfo) {
-        statusEl.textContent = `v${result.updateInfo.version} 업데이트가 있습니다. 자동 업데이트가 켜져 있으면 자동으로 설치됩니다.`;
-        statusEl.style.color = '#6366f1';
-      } else {
-        statusEl.textContent = '현재 최신 버전입니다.';
-        statusEl.style.color = '#22c55e';
-      }
-      statusEl.style.display = 'block';
-      setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
-    });
+    let updateState = { status: 'idle' };
+    function renderUpdate(s) {
+      updateState = s;
+      const check = document.getElementById('checkUpdateBtn');
+      const download = document.getElementById('downloadUpdateBtn');
+      const status = document.getElementById('updateStatus');
+      check.disabled = ['checking', 'downloading', 'downloaded'].includes(s.status);
+      check.textContent = s.status === 'checking' ? '확인 중…' : '지금 확인';
+      download.disabled = !['available', 'manual', 'downloaded'].includes(s.status);
+      download.textContent = s.status === 'downloaded' ? '설치 후 다시 시작' : '업데이트 다운로드';
+      const messages = {
+        idle: '업데이트를 확인하세요.', checking: '최신 버전 확인 중…', current: '현재 최신 버전입니다.',
+        available: `v${s.latestVersion} 업데이트를 다운로드할 수 있습니다.`,
+        downloading: `다운로드 중… ${s.percent || 0}%`, downloaded: '다운로드 완료. 설치 후 다시 시작할 수 있습니다.',
+        manual: '브라우저에서 DMG 다운로드를 시작했습니다. 앱을 종료한 뒤 Applications에 교체 설치하세요.',
+        error: `업데이트 확인 또는 다운로드 실패: ${s.error || '다시 확인해 주세요.'}`
+      };
+      status.textContent = messages[s.status]; status.style.display = 'block';
+      status.style.color = s.status === 'error' ? '#ef4444' : '#555';
+      document.getElementById('currentVersionLabel').textContent = `현재 버전: v${s.currentVersion}`;
+    }
+    ipcRenderer.on('updater:state', (_event, s) => renderUpdate(s));
+    ipcRenderer.invoke('updater:state').then(renderUpdate);
+    document.getElementById('checkUpdateBtn').onclick = async () => renderUpdate(await ipcRenderer.invoke('updater:check'));
+    document.getElementById('downloadUpdateBtn').onclick = async () => {
+      if (updateState.status === 'downloaded') await ipcRenderer.invoke('updater:install');
+      else renderUpdate(await ipcRenderer.invoke('updater:download'));
+    };
 
     document.getElementById('logoutBtn').addEventListener('click', async () => {
       if (confirm('Sign out of ModuShare?')) {

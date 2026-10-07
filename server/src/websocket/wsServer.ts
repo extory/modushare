@@ -132,6 +132,8 @@ export function attachWebSocketServer(httpServer: Server): WebSocketServer {
             // Compare against all other connected sessions of this user
             const peers = userSessions.getPeerMetas(userId, ws);
             for (const peer of peers) {
+              if (myPlatform === 'web' || peer.platform === 'web') continue;
+              if (!/^\d+\.\d+\.\d+$/.test(myVersion) || !/^\d+\.\d+\.\d+$/.test(peer.version)) continue;
               const cmp = compareSemver(peer.version, myVersion);
 
               if (cmp > 0) {

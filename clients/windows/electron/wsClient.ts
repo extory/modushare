@@ -11,7 +11,6 @@ const INITIAL_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
 const CLIENT_VERSION = app.getVersion();
 const CLIENT_PLATFORM = process.platform === 'darwin' ? 'macos' : 'windows';
-const DOWNLOAD_URL = 'https://github.com/extory/modushare/releases/latest';
 
 interface WSEnvelope {
   type: string;
@@ -248,16 +247,8 @@ export class WSClient extends EventEmitter {
       case 'VERSION_MISMATCH': {
         if (this.hasShownVersionToast) break;
         this.hasShownVersionToast = true;
-        const vm = msg.payload as { myVersion?: string; peerVersion?: string; downloadUrl?: string };
-        const url = vm.downloadUrl ?? DOWNLOAD_URL;
-        new Notification({
-          title: 'ModuShare – 업데이트 권장',
-          body: `연결된 기기가 더 최신 버전(${vm.peerVersion ?? ''})을 사용 중입니다. 최신 버전으로 업그레이드를 권장합니다.`,
-          actions: [{ type: 'button', text: '다운로드' }],
-          closeButtonText: '나중에',
-        }).show();
-        // Also emit so tray can open the URL if needed
-        this.emit('versionMismatch', url);
+        // A peer version is only a hint; verify the published release before notifying.
+        void import('./updater').then(updater => updater.checkForUpdates());
         break;
       }
 

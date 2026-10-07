@@ -11,7 +11,7 @@ interface UseWebSocketOptions {
 
 const WS_BASE = import.meta.env['VITE_WS_URL'] ?? `ws://${location.host}`;
 const MAX_BACKOFF_MS = 30_000;
-const CLIENT_VERSION = import.meta.env['VITE_APP_VERSION'] as string ?? '0.0.0';
+const CLIENT_VERSION = import.meta.env['VITE_WEB_BUILD_ID'] as string ?? 'development';
 
 export function useWebSocket({
   token,

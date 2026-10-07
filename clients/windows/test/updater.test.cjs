@@ -1,0 +1,32 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
+const originalPlatform = process.platform;
+Object.defineProperty(process,'platform',{value:'win32'});
+const updater = new EventEmitter();
+let downloads=0, checks=0, installs=0, notifications=0, release='1.3.26';
+updater.checkForUpdates=async()=>{checks++;updater.emit(release==='1.3.26'?'update-not-available':'update-available',{version:release});return {updateInfo:{version:release}}};
+updater.downloadUpdate=async()=>{downloads++;updater.emit('download-progress',{percent:65});updater.emit('update-downloaded',{});};
+updater.quitAndInstall=()=>installs++;
+require.cache[require.resolve('electron-updater')]={exports:{autoUpdater:updater}};
+require.cache[require.resolve('electron')]={exports:{app:{isPackaged:true,getVersion:()=> '1.3.26'},BrowserWindow:{getAllWindows:()=>[]},Notification:class extends EventEmitter {show(){notifications++}},shell:{}}};
+const api=require('../dist/electron/updater');
+test('version ordering rejects equal, older and malformed releases',()=>{
+ assert.equal(api.isNewerVersion('1.3.26','1.3.26'),false);
+ assert.equal(api.isNewerVersion('1.2.0','1.3.26'),false);
+ assert.equal(api.isNewerVersion('v1.3.27','1.3.26'),true);
+ assert.equal(api.isNewerVersion('1.10.0','1.9.9'),true);
+ assert.equal(api.isNewerVersion('bad','1.3.26'),false);
+});
+test('current version never enables download; newer release notifies once and downloads only on click',async()=>{
+ const interval=global.setInterval;global.setInterval=()=>({unref(){}});
+ api.setupAutoUpdater({get:()=>false});global.setInterval=interval;
+ await api.checkForUpdates();assert.equal(api.getUpdateState().status,'current');
+ await api.downloadUpdate();assert.equal(downloads,0);assert.equal(notifications,0);
+ release='1.3.27';await api.checkForUpdates();await api.checkForUpdates();
+ assert.equal(api.getUpdateState().status,'available');assert.equal(notifications,1);assert.equal(downloads,0);
+ await api.downloadUpdate();assert.equal(downloads,1);assert.equal(api.getUpdateState().status,'downloaded');
+ await api.downloadUpdate();assert.equal(downloads,1);
+ api.installUpdate();assert.equal(installs,1);
+ Object.defineProperty(process,'platform',{value:originalPlatform});
+});

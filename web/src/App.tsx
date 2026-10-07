@@ -1,3 +1,4 @@
+import { WebUpdateNotice } from './components/WebUpdateNotice';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { LoginForm } from './components/LoginForm';
@@ -56,8 +57,6 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [pendingInvitations, setPendingInvitations] = useState<ShareInvitation[]>([]);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [versionBanner, setVersionBanner] = useState<{ peerVersion: string; downloadUrl: string } | null>(null);
-  const versionBannerShown = React.useRef(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasShownFirstCopyToast = useRef(false);
 
@@ -74,13 +73,6 @@ export default function App() {
         setToken(result.accessToken);
       }
     }).finally(() => setAuthLoading(false));
-  }, []);
-
-  // ─── Version mismatch banner (최초 1회) ─────────────────────────────────────
-  const showVersionMismatchToast = useCallback((peerVersion: string, downloadUrl: string) => {
-    if (versionBannerShown.current) return;
-    versionBannerShown.current = true;
-    setVersionBanner({ peerVersion, downloadUrl });
   }, []);
 
   // ─── Toast helper ────────────────────────────────────────────────────────────
@@ -170,12 +162,7 @@ export default function App() {
           showToast(`✅ ${acc.byUsername}님이 공유 초대를 수락했습니다`);
           break;
         }
-        case 'VERSION_MISMATCH': {
-          const vm = msg.payload as { myVersion?: string; peerVersion?: string; downloadUrl?: string };
-          const url = vm.downloadUrl ?? 'https://github.com/extory/modushare/releases/latest';
-          showVersionMismatchToast(vm.peerVersion ?? '', url);
-          break;
-        }
+        // Desktop release numbers do not indicate whether this web build is stale.
         default:
           break;
       }
@@ -305,23 +292,8 @@ export default function App() {
 
   return (
     <div style={styles.shell}>
+      <WebUpdateNotice />
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
-
-      {/* ── Version mismatch banner ── */}
-      {versionBanner && (
-        <div style={styles.versionBanner}>
-          <span>🔔 연결된 기기가 더 최신 버전({versionBanner.peerVersion})을 사용 중입니다. 업그레이드를 권장합니다.</span>
-          <a
-            href={versionBanner.downloadUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={styles.versionBannerLink}
-          >
-            최신 버전 다운로드 →
-          </a>
-          <button style={styles.versionBannerClose} onClick={() => setVersionBanner(null)}>✕</button>
-        </div>
-      )}
 
       {/* ── Toast ── */}
       {toast && (

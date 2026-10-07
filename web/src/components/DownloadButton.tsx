@@ -10,6 +10,8 @@ interface ReleaseAsset {
 interface Release {
   tag_name: string;
   assets: ReleaseAsset[];
+  draft?: boolean;
+  prerelease?: boolean;
 }
 
 export function DownloadButton({ isMobile }: { isMobile?: boolean }) {
@@ -28,20 +30,22 @@ export function DownloadButton({ isMobile }: { isMobile?: boolean }) {
 
   const handleOpen = async () => {
     setOpen((v) => !v);
-    if (release) return;
+    if (open) return;
     setLoading(true);
     try {
       const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
+      if (!res.ok) throw new Error('릴리스 조회 실패');
       const data: Release = await res.json();
+      if (!/^v?\d+\.\d+\.\d+$/.test(data.tag_name) || !Array.isArray(data.assets) || data.draft || data.prerelease) throw new Error('유효하지 않은 릴리스');
       setRelease(data);
     } catch {
-      // ignore
+      setRelease(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const macAsset = release?.assets.find((a) => a.name.endsWith('.zip') && a.name.includes('mac'));
+  const macAsset = release?.assets.find((a) => a.name.endsWith('.dmg')) ?? release?.assets.find((a) => a.name.endsWith('.zip') && a.name.includes('mac'));
   const winAsset = release?.assets.find((a) => a.name.endsWith('.exe') || a.name.endsWith('.msi') || a.name.endsWith('Setup.exe'));
 
   return (
@@ -53,7 +57,7 @@ export function DownloadButton({ isMobile }: { isMobile?: boolean }) {
       {open && (
         <div style={styles.dropdown}>
           <div style={styles.version}>
-            {loading ? '로딩 중…' : release ? `최신 버전: ${release.tag_name}` : '버전 정보 없음'}
+            {loading ? '로딩 중…' : release ? `최신 버전: ${release.tag_name}` : '최신 버전을 확인하지 못했습니다. 다시 시도하세요.'}
           </div>
           <a
             href={macAsset?.browser_download_url ?? '#'}

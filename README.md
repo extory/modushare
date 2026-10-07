@@ -444,3 +444,21 @@ npm run build:tsc --prefix clients/windows
 node --test server/test/directClipboard.test.cjs
 node --test clients/windows/test/clipboard.test.cjs
 ```
+
+### Update checks
+
+- Web build IDs are emitted as `version.json`. An open web page checks at startup,
+  every five minutes and when returning to the tab; a different build shows a
+  refresh notice. Failed checks do not show an update. Desktop version messages
+  are ignored by the web UI and excluded from server peer comparisons.
+- The web download menu reads the latest stable GitHub release on opening and
+  selects the published macOS DMG / Windows installer. It does not infer the
+  version of any locally installed desktop app.
+- Desktop Preferences and the tray menu expose update checking and a download
+  action enabled only for a newer published version. Windows supports download
+  progress followed by an explicit install/restart action; the existing automatic
+  download option applies to Windows. This unsigned macOS distribution downloads
+  its architecture-specific DMG through the browser for manual replacement in
+  Applications. It does not claim to install silently.
+- Apply these fixes by deploying server/web together and publishing a new desktop
+  release. A tag build injects the application version; do not reuse an old tag.

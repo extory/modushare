@@ -1,3 +1,4 @@
+import { checkForUpdates, getUpdateState, downloadUpdate, installUpdate } from './updater';
 import { ipcMain, BrowserWindow, session, dialog, shell } from 'electron';
 import axios from 'axios';
 import http from 'http';
@@ -192,26 +193,10 @@ export function setupIpcHandlers(
     }
   );
 
-  // ── Check for updates manually ─────────────────────────────────────────────
-  ipcMain.handle('updater:check', async () => {
-    try {
-      const { autoUpdater } = require('electron-updater');
-      const result = await autoUpdater.checkForUpdates();
-      return { ok: true, updateInfo: result?.updateInfo ?? null };
-    } catch (err: unknown) {
-      return { ok: false, error: (err as Error).message };
-    }
-  });
-
-  // ── Install downloaded update now ──────────────────────────────────────────
-  ipcMain.handle('updater:install', () => {
-    try {
-      const { autoUpdater } = require('electron-updater');
-      autoUpdater.quitAndInstall(false, true);
-    } catch {
-      // ignore
-    }
-  });
+  ipcMain.handle('updater:state', () => getUpdateState());
+  ipcMain.handle('updater:check', () => checkForUpdates());
+  ipcMain.handle('updater:download', () => downloadUpdate());
+  ipcMain.handle('updater:install', () => installUpdate());
 
   // ── App version ────────────────────────────────────────────────────────────
   ipcMain.handle('app:version', () => {

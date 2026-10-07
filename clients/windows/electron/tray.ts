@@ -1,3 +1,4 @@
+import { updateEvents, getUpdateState, checkForUpdates, downloadUpdate, installUpdate } from './updater';
 import { openClipboardSender, openInbox } from './clipboardSharing';
 import { Tray, Menu, shell, app, nativeImage, dialog, Notification } from 'electron';
 import path from 'path';
@@ -106,6 +107,7 @@ export function createTray(
   });
 
   const updateMenu = () => {
+    const update = getUpdateState();
     const syncEnabled = store.get('syncEnabled');
     const isConnected = wsClient.isConnected();
 
@@ -159,6 +161,10 @@ export function createTray(
         label: '공유 관리…',
         click: () => openShareWindow(),
       },
+      { label: '업데이트 확인', enabled: !['checking', 'downloading', 'downloaded'].includes(update.status), click: () => { openPreferencesWindow(); void checkForUpdates(); } },
+      { label: update.status === 'downloaded' ? '업데이트 설치 후 다시 시작' : `업데이트 다운로드${update.latestVersion ? ' (v' + update.latestVersion + ')' : ''}`,
+        enabled: ['available', 'manual', 'downloaded'].includes(update.status),
+        click: () => { if (update.status === 'downloaded') installUpdate(); else void downloadUpdate(); } },
       {
         label: 'Preferences…',
         click: () => openPreferencesWindow(),
@@ -210,6 +216,7 @@ export function createTray(
   wsClient.on('directClipboard', startFlash);
   updateMenu();
   wsClient.on('statusChange', updateMenu);
+  updateEvents.on('change', updateMenu);
   wsClient.on('shareInvitation', () => {
     // 공유 관리 창이 열려있으면 알림 전송
     const { BrowserWindow } = require('electron');
